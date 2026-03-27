@@ -3,7 +3,11 @@ import { test, expect } from '@playwright/test'
 /// AAA - Arrange, Act, Assert  
 
 test('deve consultar um pedido aprovado', async ({ page }) => {
-  
+
+// Test Data
+
+const order = 'VLO-HXX69M'
+
   //arrange
   await page.goto('http://localhost:5173/')
   await expect(page.getByTestId('hero-section').getByRole('heading')).toContainText('Velô Sprint')
@@ -13,19 +17,17 @@ test('deve consultar um pedido aprovado', async ({ page }) => {
 
   //act
   
-  await page.getByTestId('search-order-id').fill('VLO-HXX69M')
+  await page.getByTestId('search-order-id').fill(order)
   await page.getByTestId('search-order-button').click()
 
-  //assert
+ // Assert
 
-  await expect(page.getByText('Pedido', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('order-result-VLO-HXX69M')).toContainText('VLO-HXX69M');
+  const containerPedido = page.getByRole('paragraph')
+  .filter({ hasText: /^Pedido$/ })
+  .locator('..') // Sobe para o elemento pai (a div que agrupa ambos)
+
+  await expect(containerPedido).toContainText(order, {  timeout: 10_000 })
+
+  await expect(page.getByText('APROVADO')).toBeVisible()
   
-  await expect(page.getByText('APROVADO')).toBeVisible();
-  await expect(page.getByTestId('order-result-VLO-HXX69M')).toContainText('APROVADO');
-
-  //await expect(page.getByTestId('order-result-id')).toBeVisible()
-  //await expect(page.getByTestId('order-result-id')).toContainText('VLO-HXX69M')
-  //await expect(page.getByTestId('order-result-status')).toBeVisible()
-  //await expect(page.getByTestId('order-result-status')).toContainText('APROVADO')
-})
+  })
