@@ -71,13 +71,14 @@ class OrderPage(BasePage):
             )
         )
 
-        # Step 3 – find the option by visible text using XPath
+        # Step 3 – find the option whose text (or child text) contains
+        # the store name.  Radix puts the label in a child <span>, so we
+        # use ``contains(., ...)`` which checks descendant text as well.
         option = WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable(
                 (
                     By.XPATH,
-                    f"//div[@role='option' and contains(text(), '{store_name}')]"
-                    f" | //span[@role='option' and contains(text(), '{store_name}')]",
+                    f"//div[@role='option' and contains(., '{store_name}')]",
                 )
             )
         )
