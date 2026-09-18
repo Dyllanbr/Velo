@@ -43,7 +43,7 @@ function getStatusPresentation(status: string) {
     case 'REPROVADO':
       return { Icon: XCircle, className: 'bg-red-100 text-red-700', message: null };
     case 'EM_ANALISE':
-      return { Icon: Clock, className: 'bg-secondary text-foreground', message: 'Aguardando análise de crédito.' };
+      return { Icon: Clock, className: 'bg-amber-100 text-amber-700', message: 'Aguardando análise de crédito.' };
     default:
       return { Icon: Info, className: 'bg-secondary text-foreground', message: 'Consulte o atendimento para confirmar este status.' };
   }
@@ -159,7 +159,7 @@ const OrderLookup = () => {
                     </p>
                   </div>
                 </div>
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${presentation?.className}`}>
+                <div role="status" className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${presentation?.className}`}>
                   {StatusIcon && <StatusIcon className="w-4 h-4" aria-hidden="true" />}
                   {searchedOrder.status}
                 </div>
