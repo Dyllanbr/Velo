@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { assertPreviewBuild, previewSettings } from '../../src/lib/preview-safety';
+import { checkPreviewCreditFunction } from '../../src/lib/preview-credit-preflight';
 import { fillCheckout } from '../support/mock';
 
 const settings = previewSettings(process.env);
@@ -29,6 +30,11 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
   expect(markerResponse.status()).toBe(200);
   const marker = await markerResponse.json();
   assertPreviewBuild(marker, settings);
+  const creditPreflight = await checkPreviewCreditFunction(request, settings);
+  await testInfo.attach('credit-function-preflight.json', {
+    contentType: 'application/json',
+    body: JSON.stringify({ ...creditPreflight, checkedAt: new Date().toISOString() }, null, 2),
+  });
   // Confirm production lookup works before any write. Production is accessed only by GET.
   expect(await lookup(request, settings.productionURL, settings.productionKey, 'customer_email', email)).toEqual([]);
   const blocked: string[] = [];
@@ -67,6 +73,7 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
     body: JSON.stringify({ runId, sha: marker.sha, deployment: settings.baseURL,
       previewRef: settings.previewRef, productionRef: settings.productionRef,
       orderNumber, previewCount: previewRows.length, productionCount: productionRows.length,
+      creditPreflight,
       checkedAt: new Date().toISOString(),
       note: 'Dados sintéticos permanecem no preview como evidência; produção recebeu somente GET.' }, null, 2),
   });
