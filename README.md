@@ -28,26 +28,32 @@ Uma SPA (Single Page Application) que permite:
 
 ## Instalação
 
-```bash
-# Instalar dependências
-yarn install
+Ambiente usado nesta entrega: **Node.js 24.14.0 e Yarn 1.22.22**. No Windows, mantenha projeto, caches e temporários no disco D antes de instalar dependências:
 
-# Rodar em desenvolvimento
-yarn run dev
+```powershell
+Set-Location -LiteralPath 'D:\Projetos\Velo'
+New-Item -ItemType Directory -Force 'D:\Projetos\.cache\tmp' | Out-Null
+$env:TEMP = 'D:\Projetos\.cache\tmp'
+$env:TMP = $env:TEMP
+$env:npm_config_cache = 'D:\Projetos\.cache\npm'
+$env:YARN_CACHE_FOLDER = 'D:\Projetos\.cache\yarn'
+$env:COREPACK_HOME = 'D:\Projetos\.cache\corepack'
+$env:PLAYWRIGHT_BROWSERS_PATH = 'D:\Projetos\.cache\playwright'
+npx.cmd --yes yarn@1.22.22 install --frozen-lockfile
+npx.cmd --yes yarn@1.22.22 dev
 ```
 
-Acesse: `http://localhost:5173`
+Foi essa execução via `npx.cmd` que selecionou o Yarn 1.22.22 localmente, sem instalação global. O `yarn` encontrado no Windows é um shim do Corepack; sua presença não garante essa versão. Nos comandos abaixo, substitua `yarn` por `npx.cmd --yes yarn@1.22.22` nesse terminal, mantendo as variáveis de cache acima.
+
+A porta padrão de desenvolvimento é **5173**: `http://localhost:5173`. O `vite.config.ts` não fixa uma porta; confira a URL impressa no terminal caso ela já esteja ocupada. Os E2E locais iniciam seu próprio servidor na porta 4173.
 
 ---
 
 ## Configuração do Supabase
 
-### 1. Criar Projeto
+### 1. Escolher o ambiente
 
-1. Acesse [supabase.com](https://supabase.com) e crie uma conta
-2. Clique em **New Project**
-3. Escolha um nome e senha para o banco
-4. Aguarde a criação (~2 minutos)
+O desafio exige Supabase separados para **preview** e **produção**. O banco de produção já existe; o projeto de preview ainda precisa ser provisionado. Use um ambiente de desenvolvimento/preview para os experimentos com banco real. Os testes E2E locais usam rede simulada.
 
 ### 2. Variáveis de Ambiente
 
@@ -59,26 +65,19 @@ VITE_SUPABASE_PUBLISHABLE_KEY="sua_chave_anon_publica"
 VITE_SUPABASE_URL="https://seu_project_id.supabase.co"
 ```
 
-> Encontre essas informações em: **Project Settings → API**
+Use apenas a chave pública do ambiente escolhido. As variáveis `VITE_*` são incorporadas ao JavaScript no build. Não versione `.env` nem coloque credenciais administrativas nessas variáveis.
 
-### 3. Deploy (banco + functions)
+### 3. Banco, funções e deploy
 
-```bash
-# Instalar CLI
-yarn add supabase -D
+A CLI Supabase já está nas dependências. O schema de produção corresponde ao resultado das quatro migrações locais, mas seu histórico de migrações está vazio. Nenhum `db push` ou `migration repair` foi executado em produção; não reaplique as migrações existentes sem reconciliar esse histórico.
 
-# Login e vincular projeto
-yarn supabase login
-yarn supabase link --project-ref zbfdffxonoztoydpdlru
+Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para configurar os dois ambientes e publicar pelo fluxo de CI/CD.
 
-# Aplicar migrações (cria tabelas e RLS)
-yarn supabase db push
+## Estado do desafio
 
-# Deploy das Edge Functions
-yarn supabase functions deploy
-```
+O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. A implementação do commit `74c98be` passou no check de qualidade da [execução 35299625566](https://github.com/Dyllanbr/Velo/actions/runs/35299625566); o preview parou no guard de configuração, antes do deploy e do E2E real. Isso ainda não comprova isolamento remoto nem publicação em produção.
 
-Pronto! O banco e as functions estarão configurados.
+O projeto Vercel foi criado e recebeu as variáveis de produção. Restam o Supabase de preview, o token de CI e a configuração remota completa. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
 
 ---
 
@@ -154,7 +153,14 @@ Landing → Configurador → Checkout → Análise de Crédito → Confirmação
 ## Scripts
 
 ```bash
-npm run dev      # Desenvolvimento
-npm run build    # Build de produção
-npm run lint     # Verificar código
+yarn dev                         # Desenvolvimento (porta padrão 5173)
+yarn typecheck                   # Conferir os projetos TypeScript
+node --test scripts/ci-guards.test.mjs # Testar os guards da pipeline
+yarn test:unit                   # Testes unitários com Vitest
+yarn playwright install chromium # Instalar navegador no cache configurado no D
+yarn test:e2e                    # E2E locais com rede simulada (porta 4173)
+yarn build                       # Gerar dist com as variáveis do ambiente
+yarn lint                        # Análise estática com ESLint
 ```
+
+`yarn test:e2e:preview` usa o deploy remoto e os dois Supabase; execute-o somente com os pré-requisitos descritos na documentação do desafio. Os checks locais não substituem essa evidência remota.

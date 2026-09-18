@@ -2,7 +2,24 @@
 
 ## Estado desta entrega
 
-O repositório contém a implementação do fluxo e verificações locais. **A presença destes arquivos não comprova configuração remota nem aprovação do desafio.** É necessário criar o Supabase de preview, configurar a Vercel e o GitHub, executar a pipeline e guardar a evidência real descrita abaixo. Não registre uma execução simulada como evidência de isolamento remoto.
+Retrato da execução em **18/09/2026**, referente ao commit [`74c98be`](https://github.com/Dyllanbr/Velo/commit/74c98be) e ao [PR #2, ainda em draft](https://github.com/Dyllanbr/Velo/pull/2). A implementação e a qualidade local estão disponíveis, e parte da configuração remota já foi realizada. **O desafio ainda não tem evidência de isolamento remoto nem de publicação em produção.**
+
+| Item | Estado confirmado |
+| --- | --- |
+| Qualidade no GitHub | `Unit and browser checks` passou na [execução 35299625566](https://github.com/Dyllanbr/Velo/actions/runs/35299625566), concluída às 02:32:07 UTC. |
+| Execução do PR | O [run 35300395966](https://github.com/Dyllanbr/Velo/actions/runs/35300395966) terminou com sucesso; qualidade concluída às 02:43:33 UTC. Preview e produção foram pulados por se tratar de pull request. |
+| Preview no push 35299625566 | Falhou em `Validate configuration before contacting Vercel`, às 02:32:55 UTC, com configuração incompleta. Pull, build, deploy, verificação remota e E2E real foram pulados; produção também foi pulada. O status do step não identifica sozinho qual variável faltava. |
+| Vercel | Projeto `velo` criado, plano Hobby ativo; framework Vite, Node 24.x, instalação `yarn install --frozen-lockfile`, build `yarn build` e saída `dist`. As três variáveis `VITE_SUPABASE_*` de Production foram configuradas. |
+| GitHub | Environments `preview` e `production` criados. Quatro Repository variables configuradas: `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `PRODUCTION_SUPABASE_PROJECT_REF` e `PRODUCTION_SUPABASE_URL`. Secret `PRODUCTION_SUPABASE_ANON_KEY` configurado, confirmado às 03:04:04 UTC; valor não reproduzido. |
+| Token de CI | A tentativa de `vercel tokens add` com escopo de projeto retornou **403 — `Cannot create tokens for this app`**. O formulário da conta permite restringir um token ao projeto `velo` e definir validade; a criação está pendente. A autenticação local da CLI não supre `VERCEL_TOKEN` no GitHub. |
+| Supabase de preview | Ainda não existe um segundo projeto dedicado ao Velô. O painel confirmou plano Free e limite de dois projetos gratuitos ativos já atingido; a criação está desabilitada. O outro projeto ativo não pertence ao escopo deste trabalho. Branching não está disponível. Nenhum projeto foi pausado nem plano alterado. |
+| Banco de produção | O schema observado corresponde ao resultado final das quatro migrações locais, mas a listagem do histórico remoto está vazia. Não houve `db push`, `migration repair`, reset ou alteração do schema nessa conferência. |
+
+Os IDs públicos da Vercel usados na configuração são `team_pTNVD9mWcQAWzppxe16GoBd9` (Team/Org) e `prj_UHZEp71N2PnNIQMqm34i1VqMq4XD` (Project). Eles identificam os destinos; não são tokens de acesso. Valores de chaves e credenciais não são reproduzidos nesta documentação.
+
+O relatório Playwright de testes locais do run 35299625566 foi preservado no acervo privado em `D:\Projetos\Automatiza-Ai\Evidencias\GitHub\run-35299625566\playwright-report`, antes da expiração do artefato. Esse relatório usa rede simulada e não comprova isolamento remoto.
+
+Para concluir: viabilizar o projeto Supabase de preview, aplicar nele schema/RLS/funções, obter um token de CI aceito pelo projeto, completar variáveis e secrets dos dois ambientes e executar novamente o fluxo. A configuração parcial da Vercel/GitHub não substitui um deploy bem-sucedido. Não registre os testes com rede simulada como evidência de isolamento remoto.
 
 O projeto Supabase `zbfdffxonoztoydpdlru` é tratado como produção. O guard o bloqueia como destino de preview. Um projeto de preview diferente é obrigatório. Mudar a produção exige revisar essa constante em `scripts/ci-guards.mjs` e o guard dos testes, com a justificativa no PR.
 
@@ -41,15 +58,17 @@ yarn supabase db push
 yarn supabase functions deploy --project-ref $previewRef
 ```
 
-No projeto de produção, confira o histórico das mesmas migrações antes de qualquer aplicação. Não execute reset nem limpeza de tabelas. Se houver divergência de schema/histórico, resolva-a antes da pipeline; este workflow publica o frontend e **não executa migrações de banco automaticamente**. Essa separação impede que um ajuste de interface aplique alterações de banco sem revisão.
+Em produção, a conferência somente de metadados encontrou os efeitos das quatro migrações: criação de `orders`/RLS/trigger (`20251221161820`), adição de `optionals` (`20251221163213`), remoção de `interior_color` (`20251221205335`) e renomeação de `exterior_color` para `color` (`20251221205414`). O histórico remoto foi listado sem versões. Isso não informa quem aplicou o schema nem por qual mecanismo; reaplicar cegamente tentaria criar objetos existentes.
+
+Essa divergência entre schema e histórico continua pendente de reconciliação. Não foi executado `db push` ou `migration repair` em produção. Não execute reset nem limpeza de tabelas. O workflow publica o frontend e **não executa migrações de banco automaticamente**; a preparação de um preview vazio e a reconciliação do histórico de produção são etapas distintas.
 
 Confirme nas duas plataformas que as funções usadas pelo checkout estão disponíveis. Políticas RLS determinam o que a chave pública pode fazer: chave pública não equivale a acesso irrestrito. O teste falha quando não consegue verificar o pedido por leitura; uma falha de permissão não vale como prova de ausência.
 
 ## Configurar Vercel
 
-Crie um projeto para este repositório no time correto, framework Vite. Registre o **Project ID** e o **Team/Org ID** exibidos nas configurações, sem confundir nome/slug com ID. O código exige que o resultado de `vercel pull` corresponda a esses IDs.
+O projeto `velo` já existe no time e IDs registrados acima, com framework Vite, Node 24.x e plano Hobby ativo. As configurações remotas conferidas são instalação `yarn install --frozen-lockfile`, build `yarn build` e saída `dist`, compatíveis com `vercel.json`. O código exige que o resultado de `vercel pull` corresponda aos IDs esperados; nome/slug não substituem esses IDs.
 
-Configure separadamente nos escopos **Preview** e **Production**:
+As três variáveis abaixo já foram configuradas no escopo **Production**. O escopo **Preview** permanece dependente do novo Supabase. Complete e confira os dois escopos separadamente:
 
 | Variável Vercel | Preview | Production |
 | --- | --- | --- |
@@ -63,7 +82,9 @@ Se Deployment Protection estiver habilitado, configure um segredo de bypass para
 
 ## Configurar GitHub
 
-Crie os environments `preview` e `production`. Os valores compartilhados abaixo podem ser **Repository variables/secrets**, acessíveis a ambos; se preferir variáveis por environment, preencha os nomes em todos os environments que os utilizam. Proteja a `main` e exija o check de qualidade. Proteções extras de aprovação do environment de produção são opcionais, conforme o plano da conta e a política do projeto.
+Os environments `preview` e `production` já foram criados. Estão confirmadas as quatro Repository variables listadas no estado da entrega e o secret `PRODUCTION_SUPABASE_ANON_KEY` (03:04:04 UTC). Os refs/URLs e a chave pública de preview dependem do novo Supabase; o token de CI continua pendente após a resposta 403 da Vercel. O bypass de proteção deve ser conferido conforme a configuração dos deploys.
+
+Os valores compartilhados abaixo podem ser **Repository variables/secrets**, acessíveis a ambos; se preferir variáveis por environment, preencha os nomes em todos os environments que os utilizam. A proteção da `main` e a exigência do check de qualidade devem ser conferidas; não são dadas como configuradas por este documento. Proteções extras de aprovação do environment de produção são opcionais, conforme o plano da conta e a política do projeto.
 
 | Nome | Tipo | Uso |
 | --- | --- | --- |
@@ -74,7 +95,7 @@ Crie os environments `preview` e `production`. Os valores compartilhados abaixo 
 | `PREVIEW_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de preview |
 | `PRODUCTION_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de produção |
 | `PREVIEW_SUPABASE_ANON_KEY` | Secret | Chave pública de preview, apesar do nome aceita publishable key |
-| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Chave pública de produção para build e consulta de ausência |
+| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Configurado; chave pública de produção para build e consulta de ausência |
 | `VERCEL_TOKEN` | Secret | Token com acesso ao projeto no time correto |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Secret, se necessário | Acesso da automação aos deploys protegidos |
 
@@ -82,7 +103,7 @@ Nenhuma service key é necessária. O nome “Secret” no GitHub é a forma de 
 
 ## Executar e comprovar
 
-Após configurar os recursos, faça push desta branch para obter preview. Abra a execução em Actions: todos os checks precisam passar. Guarde o relatório Playwright, a evidência JSON com o identificador único do pedido e a URL imutável do deploy. Os artefatos ficam disponíveis por sete dias; baixe a evidência necessária para a apresentação.
+Depois de resolver as pendências de configuração, execute novamente o workflow na branch `feat/preview-isolado` por dispatch ou por um novo push autorizado. O run 35299625566 documenta qualidade verde e o bloqueio preventivo, não um preview aprovado. Abra a nova execução em Actions: todos os checks precisam passar. Guarde o relatório Playwright, a evidência JSON com o identificador único do pedido e a URL imutável do deploy. Os artefatos ficam disponíveis por sete dias; baixe a evidência necessária para a apresentação.
 
 O pedido de teste permanece identificado em preview como evidência. Não há limpeza destrutiva automática. Os testes não criam pedidos em produção. Se for necessário limpar preview depois da gravação, remova apenas os identificadores explicitamente registrados pela execução.
 
@@ -92,21 +113,31 @@ Para um vídeo curto, mostre: projetos Supabase distintos; variáveis Vercel com
 
 ## Rodar localmente no disco D
 
-No computador deste trabalho, execute dentro de `D:\Projetos\Velo`. Não use instalação global local. Direcione downloads e temporários antes de instalar dependências ou navegadores:
+Ambiente local utilizado: **Node.js 24.14.0 e Yarn 1.22.22**. A pipeline usa Node 24.x e fixa Yarn 1.22.22; a configuração da Vercel usa Node 24.x. No computador deste trabalho, `Get-Command` encontra `yarn.ps1` e `yarn.CMD` como shims do Corepack em `C:\Program Files\nodejs`; isso não confirma uma versão de Yarn já pronta para uso. A execução local usou `npx.cmd --yes yarn@1.22.22`, que seleciona a versão explicitamente sem instalação global. O Node existente é apenas executado; downloads, dependências e temporários desses comandos ficam no D com a configuração abaixo:
 
 ```powershell
-New-Item -ItemType Directory -Force D:\Projetos\.cache\tmp | Out-Null
+Set-Location -LiteralPath 'D:\Projetos\Velo'
+New-Item -ItemType Directory -Force 'D:\Projetos\.cache\tmp' | Out-Null
 $env:TEMP = 'D:\Projetos\.cache\tmp'
 $env:TMP = $env:TEMP
 $env:npm_config_cache = 'D:\Projetos\.cache\npm'
 $env:YARN_CACHE_FOLDER = 'D:\Projetos\.cache\yarn'
+$env:COREPACK_HOME = 'D:\Projetos\.cache\corepack'
 $env:PLAYWRIGHT_BROWSERS_PATH = 'D:\Projetos\.cache\playwright'
-yarn install --frozen-lockfile
+npx.cmd --yes yarn@1.22.22 install --frozen-lockfile
+npx.cmd --yes yarn@1.22.22 typecheck
 node --test scripts/ci-guards.test.mjs
-yarn test:unit
-yarn playwright install chromium
-yarn test:e2e
+npx.cmd --yes yarn@1.22.22 test:unit
+npx.cmd --yes yarn@1.22.22 playwright install chromium
+npx.cmd --yes yarn@1.22.22 test:e2e
+# Gerar o bundle com as variáveis locais e iniciar a aplicação, quando necessário:
+npx.cmd --yes yarn@1.22.22 build
+npx.cmd --yes yarn@1.22.22 dev
 ```
+
+Nos demais exemplos locais deste documento, `yarn` pode ser substituído por `npx.cmd --yes yarn@1.22.22`, na mesma sessão configurada. Não é necessário executar `corepack enable` nem instalar Yarn globalmente no C.
+
+A porta padrão de `yarn dev` é **5173**. O `vite.config.ts` não a fixa; se estiver ocupada, use a URL que o Vite imprimir no terminal. O E2E local usa sua própria configuração em `127.0.0.1:4173`, com `strictPort`, valores de ambiente simulados e encerramento automático do servidor. `yarn test:e2e:preview` é a suíte remota e requer todas as configurações reais descritas acima.
 
 Os runners GitHub são Linux hospedado e usam armazenamento descartável deles, não o disco C do computador. O arquivo `public/build-info.json` é gerado pela pipeline; não precisa ser criado manualmente nem versionado. Não envie `.env`, `.vercel`, temporários Supabase, senha de banco ou relatórios que contenham credenciais para o repositório.
 
