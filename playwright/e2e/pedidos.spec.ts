@@ -29,7 +29,8 @@ test.describe('Consulta de pedidos', () => {
     await expect(resultCard).toMatchAriaSnapshot(String.raw`
       - paragraph: Pedido
       - paragraph: ${order.order_number}
-      - text: ${order.status}
+      - status:
+        - text: ${order.status}
       - img "Velô Sprint"
       - paragraph: Modelo
       - paragraph: Velô Sprint
