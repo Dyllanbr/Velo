@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPreviewBuild, assertPublicKey, KNOWN_PRODUCTION_REF, previewSettings } from './preview-safety';
+import { assertPreviewBuild, assertPublicKey, isOptionalVercelToolbarRequest, KNOWN_PRODUCTION_REF, previewSettings } from './preview-safety';
 
 const ref = 'abcdefghijklmnopqrst';
 const publicKey = 'sb_publishable_fixture_only';
@@ -11,6 +11,36 @@ const valid = {
   PRODUCTION_SUPABASE_ANON_KEY: publicKey, GITHUB_SHA: 'a'.repeat(40),
 };
 const jwt = (role: string, projectRef: string) => `header.${btoa(JSON.stringify({ role, ref: projectRef }))}.signature`;
+
+describe('supressão estrita do script opcional da Vercel', () => {
+  const toolbar = { url: 'https://vercel.live/_next-live/feedback/feedback.js', method: 'GET', resourceType: 'script' };
+  it('classifica somente o GET exato do script para abortar, sem autorizar tráfego', () => {
+    expect(isOptionalVercelToolbarRequest(toolbar)).toBe(true);
+  });
+  it.each(['POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'get'])('não ignora método %s', (method) => {
+    expect(isOptionalVercelToolbarRequest({ ...toolbar, method })).toBe(false);
+  });
+  it.each(['fetch', 'xhr', 'document', 'image', 'stylesheet', 'other'])('não ignora recurso %s', (resourceType) => {
+    expect(isOptionalVercelToolbarRequest({ ...toolbar, resourceType })).toBe(false);
+  });
+  it.each([
+    `${toolbar.url}?token=fixture`, `${toolbar.url}#fragment`, `${toolbar.url}.evil`, `${toolbar.url}/`,
+    'https://vercel.live/_next-live/feedback/other.js',
+    'https://vercel.live.evil.invalid/_next-live/feedback/feedback.js',
+    'https://sub.vercel.live/_next-live/feedback/feedback.js',
+    'https://verce1.live/_next-live/feedback/feedback.js',
+    'https://user:fixture@vercel.live/_next-live/feedback/feedback.js',
+    'https://vercel.live@outside.invalid/_next-live/feedback/feedback.js',
+    'https://vercel.live:443/_next-live/feedback/feedback.js',
+    'https://vercel.live/_next-live/feedback/%66eedback.js',
+    'https://%76ercel.live/_next-live/feedback/feedback.js',
+    'http://vercel.live/_next-live/feedback/feedback.js',
+    '//vercel.live/_next-live/feedback/feedback.js',
+    'not-a-url',
+  ])('não ignora URL alterada: %s', (url) => {
+    expect(isOptionalVercelToolbarRequest({ ...toolbar, url })).toBe(false);
+  });
+});
 
 describe('guardas fail-closed da integração real', () => {
   it('aceita preview distinto com dados completos', () => {
