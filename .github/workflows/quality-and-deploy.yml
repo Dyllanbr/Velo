@@ -1,0 +1,202 @@
+name: Quality and isolated deployment
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feat/preview-isolado]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize releases; a stale main run is also rejected immediately before promotion.
+concurrency:
+  group: velo-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  VERCEL_CLI_VERSION: '59.15.1'
+
+jobs:
+  quality:
+    name: Unit and browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global yarn@1.22.22
+      - run: yarn install --frozen-lockfile
+      - run: yarn typecheck
+      - run: node --test scripts/ci-guards.test.mjs
+      - run: yarn test:unit
+      - run: yarn build
+        env:
+          VITE_SUPABASE_URL: https://preview-fixture.invalid
+          VITE_SUPABASE_PROJECT_ID: previewfixtureaaaaaa
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_localmockonly1234567890
+      - run: yarn playwright install --with-deps chromium
+      - run: yarn test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-test-results-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  preview:
+    name: Deploy preview and prove database isolation
+    needs: quality
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/preview-isolado')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: preview
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      PREVIEW_SUPABASE_PROJECT_REF: ${{ vars.PREVIEW_SUPABASE_PROJECT_REF }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      VITE_SUPABASE_URL: ${{ vars.PREVIEW_SUPABASE_URL }}
+      VITE_SUPABASE_PROJECT_ID: ${{ vars.PREVIEW_SUPABASE_PROJECT_REF }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      tested_sha: ${{ steps.provenance.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global yarn@1.22.22 vercel@${VERCEL_CLI_VERSION}
+      - run: yarn install --frozen-lockfile
+      - name: Validate configuration before contacting Vercel
+        run: node scripts/ci-guards.mjs environment preview
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Download preview settings
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - run: node scripts/ci-guards.mjs prepare preview
+      - name: Build with preview settings
+        run: vercel build --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - run: node scripts/ci-guards.mjs bundle preview
+      - name: Deploy the verified preview artifact
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Verify the deployed bundle and SPA routes
+        run: node scripts/verify-deployment.mjs preview "$DEPLOYMENT_URL"
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - run: yarn playwright install --with-deps chromium
+      - name: Run real E2E only against preview
+        run: yarn test:e2e:preview
+        env:
+          E2E_PREVIEW_ALLOWED: 'true'
+          E2E_BASE_URL: ${{ steps.deploy.outputs.url }}
+          PREVIEW_SUPABASE_URL: ${{ vars.PREVIEW_SUPABASE_URL }}
+          PREVIEW_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
+          PRODUCTION_SUPABASE_URL: ${{ vars.PRODUCTION_SUPABASE_URL }}
+          PRODUCTION_SUPABASE_ANON_KEY: ${{ secrets.PRODUCTION_SUPABASE_ANON_KEY }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Record the SHA only after E2E succeeds
+        id: provenance
+        run: |
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "Preview E2E passed for commit $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-evidence-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  production:
+    name: Build production at tested SHA and promote
+    needs: preview
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      PREVIEW_SUPABASE_PROJECT_REF: ${{ vars.PREVIEW_SUPABASE_PROJECT_REF }}
+      PRODUCTION_SUPABASE_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      VITE_SUPABASE_URL: ${{ vars.PRODUCTION_SUPABASE_URL }}
+      VITE_SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preview.outputs.tested_sha }}
+          persist-credentials: false
+      - name: Verify commit provenance
+        env:
+          TESTED_SHA: ${{ needs.preview.outputs.tested_sha }}
+        run: |
+          test "$TESTED_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TESTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global yarn@1.22.22 vercel@${VERCEL_CLI_VERSION}
+      - run: yarn install --frozen-lockfile
+      - name: Validate production configuration
+        run: node scripts/ci-guards.mjs environment production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Download production settings
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - run: node scripts/ci-guards.mjs prepare production
+      - name: Rebuild with production variables
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - run: node scripts/ci-guards.mjs bundle production
+      - name: Stage production without moving the domain
+        id: staged
+        run: |
+          url=$(vercel deploy --prebuilt --prod --skip-domain --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Verify production bundle without creating orders
+        run: node scripts/verify-deployment.mjs production "$DEPLOYMENT_URL"
+        env:
+          DEPLOYMENT_URL: ${{ steps.staged.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Refuse to promote an outdated main commit
+        run: test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+      - name: Promote the checked production build
+        run: vercel promote "$DEPLOYMENT_URL" --yes --token="$VERCEL_TOKEN"
+        env:
+          DEPLOYMENT_URL: ${{ steps.staged.outputs.url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Record release provenance
+        run: echo "Promoted production build for tested commit $GITHUB_SHA; preview artifact was not reused." >> "$GITHUB_STEP_SUMMARY"
