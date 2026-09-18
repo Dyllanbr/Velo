@@ -21,6 +21,8 @@ const bundle = `${env.VITE_SUPABASE_URL} ${env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 function harness(override = () => undefined) {
   const calls = [];
   const logs = [];
+  const waits = [];
+  let elapsed = 0;
   const fetchImpl = async (url, options) => {
     calls.push({ url: url.href, options });
     const custom = await override(url, options);
@@ -29,8 +31,9 @@ function harness(override = () => undefined) {
     if (url.pathname === '/assets/app.js') return new Response(bundle);
     return new Response(html);
   };
-  return { calls, logs, run: (url = base) => verifyDeployment('preview', url, {
-    env, fetchImpl, log: (line) => logs.push(line),
+  return { calls, logs, waits, advance: (ms) => { elapsed += ms; }, run: (url = base) => verifyDeployment('preview', url, {
+    env, fetchImpl, log: (line) => logs.push(line), now: () => elapsed,
+    sleep: async (ms) => { waits.push(ms); elapsed += ms; },
   }) };
 }
 
@@ -69,6 +72,7 @@ test('does not follow redirects or retry authorization errors', async () => {
   for (const status of [301, 302, 303, 307, 308, 401, 403]) {
     const check = harness(() => new Response('', { status, headers: {
       location: `https://outside.invalid/?secret=${env.VERCEL_AUTOMATION_BYPASS_SECRET}`,
+      'x-vercel-error': 'DEPLOYMENT_NOT_FOUND',
     } }));
     await assert.rejects(check.run(), new RegExp(`HTTP ${status}`));
     assert.equal(check.calls.length, 1);
@@ -100,6 +104,7 @@ test('sanitizes invalid marker JSON, network errors, paths and diagnostic header
   await assert.rejects(invalid.run(), (error) => error.message.includes('invalid JSON') && !error.message.includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
   const network = harness(() => { throw new Error(`url?token=${env.VERCEL_AUTOMATION_BYPASS_SECRET}`); });
   await assert.rejects(network.run(), (error) => error.message.includes('/build-info.json') && !error.message.includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
+  assert.equal(network.calls.length, 1);
   const path = harness((url) => url.pathname === '/' ? new Response(
     `<div id="root"></div><script src="/assets/${env.VERCEL_AUTOMATION_BYPASS_SECRET}.js?token=private-query"></script>`,
   ) : url.pathname.startsWith('/assets/') ? new Response('', {
@@ -109,6 +114,100 @@ test('sanitizes invalid marker JSON, network errors, paths and diagnostic header
   const diagnostic = path.logs.join('\n');
   for (const forbidden of [env.VERCEL_AUTOMATION_BYPASS_SECRET, 'private-query', 'untrusted header value']) {
     assert(!diagnostic.includes(forbidden));
+  }
+});
+
+function missingDeployment(status = 404, code = 'DEPLOYMENT_NOT_FOUND') {
+  return new Response('private-platform-body', { status, headers: {
+    'x-vercel-error': code, 'x-vercel-id': 'cle1::fixture-123',
+  } });
+}
+
+test('rechecks only initial deployment-not-found responses before validating the entire application', async () => {
+  let missing = 2;
+  const check = harness((url) => url.pathname === '/build-info.json' && missing-- > 0 ? missingDeployment() : undefined);
+  await check.run();
+  assert.deepEqual(check.waits, [1_000, 2_000]);
+  assert.deepEqual(check.calls.map(({ url }) => new URL(url).pathname), [
+    '/build-info.json', '/build-info.json', '/build-info.json', '/', '/assets/app.js', '/configure', '/lookup',
+  ]);
+  assert.equal(check.logs.filter((line) => line.includes('HTTP 404; x-vercel-error=DEPLOYMENT_NOT_FOUND')).length, 2);
+  assert(check.logs.some((line) => line.includes('HTTP 200; attempt=3/4')));
+  for (const { options } of check.calls) {
+    assert.equal(options.method, 'GET');
+    assert.equal(options.redirect, 'manual');
+    assert.equal(options.headers['x-vercel-protection-bypass'], env.VERCEL_AUTOMATION_BYPASS_SECRET);
+  }
+  assert(!check.logs.join('\n').includes('private-platform-body'));
+  assert(!check.logs.join('\n').includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
+});
+
+test('fails closed after four initial-marker attempts and preserves every HTTP diagnostic', async () => {
+  const check = harness(() => missingDeployment());
+  await assert.rejects(check.run(), /HTTP 404; x-vercel-error=DEPLOYMENT_NOT_FOUND.*readiness exhausted after 4 attempt/);
+  assert.equal(check.calls.length, 4);
+  assert.deepEqual(check.waits, [1_000, 2_000, 4_000]);
+  assert.equal(check.logs.filter((line) => line.includes('HTTP 404;')).length, 4);
+  assert(check.calls.every(({ url }) => new URL(url).pathname === '/build-info.json'));
+});
+
+test('request time consumes the shared readiness budget instead of resetting it per attempt', async () => {
+  const check = harness(() => {
+    check.advance(8_000);
+    return missingDeployment();
+  });
+  await assert.rejects(check.run(), /HTTP 404.*readiness exhausted after 2 attempt/);
+  assert.equal(check.calls.length, 2);
+  assert.deepEqual(check.waits, [1_000]);
+  // A slow success must not extend the deadline either. Real fetch/body reads
+  // receive an AbortSignal for the remaining budget; the mock advances time.
+  const slow = harness(() => {
+    const response = new Response(JSON.stringify(marker));
+    response.text = async () => { slow.advance(15_000); return JSON.stringify(marker); };
+    return response;
+  });
+  await assert.rejects(slow.run(), /readiness window exhausted/);
+  assert.equal(slow.calls.length, 1);
+  assert.deepEqual(slow.waits, []);
+});
+
+test('does not retry other status/header combinations or already-followed responses', async () => {
+  for (const [status, code, redirected] of [
+    [404, '', false], [404, 'NOT_FOUND', false], [404, 'deployment_not_found', false],
+    [500, 'DEPLOYMENT_NOT_FOUND', false], [404, 'DEPLOYMENT_NOT_FOUND', true],
+  ]) {
+    const check = harness(() => {
+      const response = missingDeployment(status, code);
+      Object.defineProperty(response, 'redirected', { value: redirected });
+      return response;
+    });
+    await assert.rejects(check.run(), new RegExp(`HTTP ${status}`));
+    assert.equal(check.calls.length, 1);
+    assert.deepEqual(check.waits, []);
+  }
+});
+
+test('deployment-not-found on an asset or SPA route never receives readiness retries', async () => {
+  for (const path of ['/', '/assets/app.js', '/configure', '/lookup']) {
+    const check = harness((url) => url.pathname === path ? missingDeployment() : undefined);
+    await assert.rejects(check.run(), /HTTP 404; x-vercel-error=DEPLOYMENT_NOT_FOUND/);
+    assert.equal(check.calls.filter(({ url }) => new URL(url).pathname === path).length, 1);
+    assert.deepEqual(check.waits, []);
+  }
+});
+
+test('a recovered marker still rejects invalid JSON, SHA, environment and database without further retries', async () => {
+  for (const body of ['not-json', ...[
+    { sha: 'b'.repeat(40) }, { environment: 'production' }, { supabaseProjectRef: KNOWN_PRODUCTION_REF },
+  ].map((wrong) => JSON.stringify({ ...marker, ...wrong }))]) {
+    let initial = true;
+    const check = harness(() => {
+      if (initial) { initial = false; return missingDeployment(); }
+      return new Response(body);
+    });
+    await assert.rejects(check.run(), /invalid JSON|deployed/);
+    assert.equal(check.calls.length, 2);
+    assert.deepEqual(check.waits, [1_000]);
   }
 });
 
