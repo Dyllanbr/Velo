@@ -10,7 +10,10 @@ test('consulta normaliza número e exibe pedido aprovado criado pelo próprio te
   await page.goto('/lookup');
   await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(`  ${order.order_number.toLowerCase()}  `);
   await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
-  await expect(page.getByText(order.order_number, { exact: true })).toBeVisible({ timeout: 10_000 });
+  const orderGroup = page.getByRole('paragraph')
+    .filter({ hasText: /^Pedido$/ })
+    .locator('..');
+  await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText('APROVADO', { exact: true })).toBeVisible();
   await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
 });
