@@ -75,9 +75,9 @@ Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para co
 
 ## Estado do desafio
 
-O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. Na verificação de 18/09/2026, o commit `7b0cd1c` passou nos checks do [PR (execução 35316716372)](https://github.com/Dyllanbr/Velo/actions/runs/35316716372). Na [execução de push 35316712267](https://github.com/Dyllanbr/Velo/actions/runs/35316712267), a qualidade passou e o preview parou no guard de configuração, antes do deploy e do E2E real. Isso ainda não comprova isolamento remoto nem publicação em produção.
+O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. A integração local de 18/09/2026 passou com 19 E2E, 51 unitários, seis guards, tipos e build. O lint completo passou com zero erros e sete avisos de Fast Refresh; agora também integra o workflow. A última execução remota conferida antes desta atualização foi `af742bc`: [PR aprovado](https://github.com/Dyllanbr/Velo/actions/runs/35322968592) e [push com qualidade aprovada e preview bloqueado na configuração](https://github.com/Dyllanbr/Velo/actions/runs/35322964915). Isso ainda não comprova isolamento remoto nem publicação em produção.
 
-O projeto Vercel foi criado e recebeu as variáveis de produção. Restam o Supabase de preview, o token de CI e a configuração remota completa. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
+O projeto Vercel recebeu as variáveis de produção. O token de CI, restrito ao projeto `velo` e válido até 25/09/2026, foi salvo como `VERCEL_TOKEN` no GitHub. Restam o Supabase de preview e sua configuração remota; nenhum projeto externo foi pausado para liberar cota. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
 
 ---
 
@@ -151,7 +151,7 @@ A [função de crédito](supabase/functions/credit-analysis/index.ts) aceita uma
 
 A [confirmação](src/pages/Success.tsx) distingue os três resultados: aprovação, reprovação e crédito em análise. O estado `EM_ANALISE` usa relógio, apresentação neutra e mensagem de que o pedido aguarda análise; não é apresentado como reprovação. Os testes locais percorrem o checkout com scores simulados 800, 400 e 600, conferindo o status enviado e a mensagem resultante sem alterar as regras de decisão.
 
-Limitação visual ainda presente na consulta: ela preserva o texto do status, mas usa estilo negativo para os não aprovados. Essa apresentação continua pendente de revisão; `EM_ANALISE` é um resultado distinto de reprovação.
+A [consulta](src/pages/OrderLookup.tsx) também distingue os três resultados e preserva seus códigos visíveis. `EM_ANALISE` mostra relógio e mensagem de espera. Valores históricos desconhecidos, como `pending`, mantêm o texto recebido e uma indicação neutra para consultar o atendimento, sem serem convertidos em aprovação ou reprovação. Quatro cenários locais verificam a leitura e a apresentação; eles não comprovam persistência no banco remoto.
 
 ---
 
