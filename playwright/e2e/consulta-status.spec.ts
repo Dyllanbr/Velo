@@ -1,5 +1,16 @@
 import { test, expect, orderFixture } from '../support/mock';
+import { Navbar } from '../support/components/Navbar';
+import { LandingPage } from '../support/pages/LandingPage';
 import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
+
+let orderLookupPage: OrderLookupPage;
+
+test.beforeEach(async ({ page }) => {
+  await new LandingPage(page).goto();
+  await new Navbar(page).orderLookupLink();
+  orderLookupPage = new OrderLookupPage(page);
+  await orderLookupPage.validatePageLoaded();
+});
 
 const outcomes = [
   { status: 'APROVADO', message: null },
@@ -19,8 +30,6 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
       await route.fulfill({ json: [order] });
     });
 
-    await page.goto('/lookup');
-    const orderLookupPage = new OrderLookupPage(page);
     await orderLookupPage.searchOrder(order.order_number);
     const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
     await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
@@ -72,8 +81,6 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
     await route.fulfill({ json: [order] });
   });
 
-  await page.goto('/lookup');
-  const orderLookupPage = new OrderLookupPage(page);
   await orderLookupPage.searchOrder(order.order_number);
   const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
   await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
