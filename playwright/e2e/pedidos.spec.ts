@@ -1,12 +1,16 @@
 import { test, expect, orderFixture, fillCheckout } from '../support/mock';
+import { Navbar } from '../support/components/Navbar';
+import { LandingPage } from '../support/pages/LandingPage';
 import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
 
 test.describe('Consulta de pedidos', () => {
+  let orderLookupPage: OrderLookupPage;
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('/lookup');
-    await expect(page.getByRole('heading', {
-      name: 'Consultar Pedido', exact: true, level: 3,
-    })).toBeVisible();
+    await new LandingPage(page).goto();
+    await new Navbar(page).orderLookupLink();
+    orderLookupPage = new OrderLookupPage(page);
+    await orderLookupPage.validatePageLoaded();
   });
 
   test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page }) => {
@@ -25,7 +29,6 @@ test.describe('Consulta de pedidos', () => {
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
       await route.fulfill({ json: [order] });
     });
-    const orderLookupPage = new OrderLookupPage(page);
     await orderLookupPage.searchOrder(`  ${order.order_number.toLowerCase()}  `);
     const orderGroup = page.getByRole('paragraph')
       .filter({ hasText: /^Pedido$/ })
@@ -39,7 +42,6 @@ test.describe('Consulta de pedidos', () => {
 
   test('consulta informa quando não há pedido', async ({ page }) => {
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
-    const orderLookupPage = new OrderLookupPage(page);
     await orderLookupPage.searchOrder(orderFixture().order_number);
     await orderLookupPage.validateOrderNotFound();
   });
@@ -53,7 +55,6 @@ test.describe('Consulta de pedidos', () => {
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${orderCode}`);
       await route.fulfill({ json: [] });
     });
-    const orderLookupPage = new OrderLookupPage(page);
     await orderLookupPage.searchOrder(`  ${orderCode.toLowerCase()}  `);
     await orderLookupPage.validateOrderNotFound();
     expect(requests).toEqual(['GET']);
