@@ -28,26 +28,32 @@ Uma SPA (Single Page Application) que permite:
 
 ## Instalação
 
-```bash
-# Instalar dependências
-yarn install
+Ambiente usado nesta entrega: **Node.js 24.14.0 e Yarn 1.22.22**. No Windows, mantenha projeto, caches e temporários no disco D antes de instalar dependências:
 
-# Rodar em desenvolvimento
-yarn run dev
+```powershell
+Set-Location -LiteralPath 'D:\Projetos\Velo'
+New-Item -ItemType Directory -Force 'D:\Projetos\.cache\tmp' | Out-Null
+$env:TEMP = 'D:\Projetos\.cache\tmp'
+$env:TMP = $env:TEMP
+$env:npm_config_cache = 'D:\Projetos\.cache\npm'
+$env:YARN_CACHE_FOLDER = 'D:\Projetos\.cache\yarn'
+$env:COREPACK_HOME = 'D:\Projetos\.cache\corepack'
+$env:PLAYWRIGHT_BROWSERS_PATH = 'D:\Projetos\.cache\playwright'
+npx.cmd --yes yarn@1.22.22 install --frozen-lockfile
+npx.cmd --yes yarn@1.22.22 dev
 ```
 
-Acesse: `http://localhost:5173`
+Foi essa execução via `npx.cmd` que selecionou o Yarn 1.22.22 localmente, sem instalação global. O `yarn` encontrado no Windows é um shim do Corepack; sua presença não garante essa versão. Nos comandos abaixo, substitua `yarn` por `npx.cmd --yes yarn@1.22.22` nesse terminal, mantendo as variáveis de cache acima.
+
+A porta padrão de desenvolvimento é **5173**: `http://localhost:5173`. O `vite.config.ts` não fixa uma porta; confira a URL impressa no terminal caso ela já esteja ocupada. Os E2E locais iniciam seu próprio servidor na porta 4173.
 
 ---
 
 ## Configuração do Supabase
 
-### 1. Criar Projeto
+### 1. Escolher o ambiente
 
-1. Acesse [supabase.com](https://supabase.com) e crie uma conta
-2. Clique em **New Project**
-3. Escolha um nome e senha para o banco
-4. Aguarde a criação (~2 minutos)
+O desafio exige Supabase separados para **preview** e **produção**. O banco de produção já existe; o projeto de preview ainda precisa ser provisionado. Use um ambiente de desenvolvimento/preview para os experimentos com banco real. Os testes E2E locais usam rede simulada.
 
 ### 2. Variáveis de Ambiente
 
@@ -59,26 +65,19 @@ VITE_SUPABASE_PUBLISHABLE_KEY="sua_chave_anon_publica"
 VITE_SUPABASE_URL="https://seu_project_id.supabase.co"
 ```
 
-> Encontre essas informações em: **Project Settings → API**
+Use apenas a chave pública do ambiente escolhido. As variáveis `VITE_*` são incorporadas ao JavaScript no build. Não versione `.env` nem coloque credenciais administrativas nessas variáveis.
 
-### 3. Deploy (banco + functions)
+### 3. Banco, funções e deploy
 
-```bash
-# Instalar CLI
-yarn add supabase -D
+A CLI Supabase já está nas dependências. O schema de produção corresponde ao resultado das quatro migrações locais, mas seu histórico de migrações está vazio. Nenhum `db push` ou `migration repair` foi executado em produção; não reaplique as migrações existentes sem reconciliar esse histórico.
 
-# Login e vincular projeto
-yarn supabase login
-yarn supabase link --project-ref zbfdffxonoztoydpdlru
+Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para configurar os dois ambientes e publicar pelo fluxo de CI/CD.
 
-# Aplicar migrações (cria tabelas e RLS)
-yarn supabase db push
+## Estado do desafio
 
-# Deploy das Edge Functions
-yarn supabase functions deploy
-```
+O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. A integração local de 18/09/2026 passou com 19 E2E, 51 unitários, seis guards, tipos e build. O lint completo passou com zero erros e sete avisos de Fast Refresh; agora também integra o workflow. A última execução remota conferida antes desta atualização foi `af742bc`: [PR aprovado](https://github.com/Dyllanbr/Velo/actions/runs/35322968592) e [push com qualidade aprovada e preview bloqueado na configuração](https://github.com/Dyllanbr/Velo/actions/runs/35322964915). Isso ainda não comprova isolamento remoto nem publicação em produção.
 
-Pronto! O banco e as functions estarão configurados.
+O projeto Vercel recebeu as variáveis de produção. O token de CI, restrito ao projeto `velo` e válido até 25/09/2026, foi salvo como `VERCEL_TOKEN` no GitHub. Restam o Supabase de preview e sua configuração remota; nenhum projeto externo foi pausado para liberar cota. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
 
 ---
 
@@ -116,37 +115,53 @@ src/
 - **Rodas Sport:** +R$ 2.000
 - **Precision Park:** +R$ 5.500
 - **Flux Capacitor:** +R$ 5.000
-- **Financiamento:** 12x com juros de 2% a.m.
+- **Financiamento no checkout atual:** 12 parcelas de `(max(0, preço - entrada) / 12) × 1,02`. O total é a entrada somada às 12 parcelas.
+
+Há uma divergência conhecida: o [checkout](src/pages/Order.tsx) aplica o fator 1,02 uma única vez sobre o saldo, enquanto o helper `calculateInstallment` no [store](src/store/configuratorStore.ts) usa uma fórmula de prestação constante com taxa de 2% por período, em 12 períodos. Esse helper não é chamado pelo checkout. A regra financeira precisa ser reconciliada com os requisitos antes de apresentar uma fórmula como definitiva.
 
 ---
 
 ## Banco de Dados
 
 **Tabela `orders`** — campos principais:
-- `order_number` — Formato: VLO-XXXXXX
+- `order_number` — Gerado pelo cliente como VLO- seguido de seis letras maiúsculas/números; o banco exige unicidade, mas não valida esse formato
 - `color`, `wheel_type`, `optionals` — Configuração
 - `customer_name`, `customer_email`, `customer_cpf` — Cliente
 - `payment_method`, `total_price` — Pagamento
-- `status` — pending, approved, rejected, analysis
+- `status` — O fluxo da aplicação grava `APROVADO`, `REPROVADO` ou `EM_ANALISE`. A coluna é `TEXT`, sem restrição desses valores, e a migração inicial ainda define o default histórico `pending`
+
+Entrada e valor da parcela não são persistidos separadamente no modelo atual. No financiamento, `total_price` recebe a entrada somada às parcelas calculadas pelo checkout. A parcela aparece na confirmação imediata porque é acrescentada ao objeto em memória; uma nova consulta não a recupera do banco.
 
 ---
 
 ## Análise de Crédito
 
-| Score | Resultado |
-|-------|-----------|
-| > 700 | Aprovado |
-| 501-700 | Em análise |
-| ≤ 500 | Reprovado |
+A análise é solicitada apenas no financiamento. A Edge Function obtém o score, e o checkout decide o status nesta ordem:
 
-*Se entrada ≥ 50% do total, aprova mesmo com score < 700*
+| Condição, em ordem de avaliação | Status |
+|--------------------------------|--------|
+| Entrada ≥ 50% e score < 700 | `APROVADO` |
+| Score > 700 | `APROVADO` |
+| Score entre 501 e 700, inclusive | `EM_ANALISE` |
+| Demais casos | `REPROVADO` |
+
+Score exatamente 700 fica `EM_ANALISE`, inclusive com entrada de pelo menos 50%. Em falha da consulta ou resposta sem score numérico, o fluxo mostra erro e não cria o pedido.
+
+A [função de crédito](supabase/functions/credit-analysis/index.ts) aceita uma URL configurada e possui um fallback UAT. O Bearer gerado no código é um token aleatório de simulação; a integração externa ainda depende de contrato e autenticação válidos. Os testes com respostas simuladas e o preflight de corpo vazio não comprovam uma consulta real ao provedor.
+
+A [confirmação](src/pages/Success.tsx) distingue os três resultados: aprovação, reprovação e crédito em análise. O estado `EM_ANALISE` usa relógio, apresentação neutra e mensagem de que o pedido aguarda análise; não é apresentado como reprovação. Os testes locais percorrem o checkout com scores simulados 800, 400 e 600, conferindo o status enviado e a mensagem resultante sem alterar as regras de decisão.
+
+A [consulta](src/pages/OrderLookup.tsx) também distingue os três resultados e preserva seus códigos visíveis. `EM_ANALISE` mostra relógio e mensagem de espera. Valores históricos desconhecidos, como `pending`, mantêm o texto recebido e uma indicação neutra para consultar o atendimento, sem serem convertidos em aprovação ou reprovação. Quatro cenários locais verificam a leitura e a apresentação; eles não comprovam persistência no banco remoto.
 
 ---
 
 ## Fluxo Principal
 
 ```
-Landing → Configurador → Checkout → Análise de Crédito → Confirmação
+Landing → Configurador → Checkout
+                           ├─ À vista → Criar pedido → Confirmação
+                           └─ Financiamento → Consultar score → Decidir status
+                                                                └─ Criar pedido → Confirmação
 ```
 
 ---
@@ -154,7 +169,14 @@ Landing → Configurador → Checkout → Análise de Crédito → Confirmação
 ## Scripts
 
 ```bash
-npm run dev      # Desenvolvimento
-npm run build    # Build de produção
-npm run lint     # Verificar código
+yarn dev                         # Desenvolvimento (porta padrão 5173)
+yarn typecheck                   # Conferir os projetos TypeScript
+node --test scripts/ci-guards.test.mjs # Testar os guards da pipeline
+yarn test:unit                   # Testes unitários com Vitest
+yarn playwright install chromium # Instalar navegador no cache configurado no D
+yarn test:e2e                    # E2E locais com rede simulada (porta 4173)
+yarn build                       # Gerar dist com as variáveis do ambiente
+yarn lint                        # Análise estática com ESLint
 ```
+
+`yarn test:e2e:preview` usa o deploy remoto e os dois Supabase; execute-o somente com os pré-requisitos descritos na documentação do desafio. Os checks locais não substituem essa evidência remota.
