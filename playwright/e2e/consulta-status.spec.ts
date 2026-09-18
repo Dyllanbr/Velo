@@ -1,4 +1,5 @@
 import { test, expect, orderFixture } from '../support/mock';
+import { OrderLookupPage } from '../support/pages/OrderLookupPage';
 
 const outcomes = [
   { status: 'APROVADO', message: null },
@@ -44,8 +45,8 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
     });
 
     await page.goto('/lookup');
-    await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(order.order_number);
-    await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+    const orderLookupPage = new OrderLookupPage(page);
+    await orderLookupPage.searchOrder(order.order_number);
     const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
     await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
     await expect(page.getByText(outcome.status, { exact: true })).toBeVisible();
@@ -109,8 +110,8 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
   });
 
   await page.goto('/lookup');
-  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(order.order_number);
-  await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+  const orderLookupPage = new OrderLookupPage(page);
+  await orderLookupPage.searchOrder(order.order_number);
   const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
   await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
   await expect(page.getByText(order.status, { exact: true })).toBeVisible();
