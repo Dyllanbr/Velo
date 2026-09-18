@@ -36,7 +36,7 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn lint
       - run: yarn typecheck
-      - run: node --test scripts/ci-guards.test.mjs
+      - run: node --test scripts/ci-guards.test.mjs scripts/verify-deployment.test.mjs
       - run: yarn test:unit
       - run: yarn build
         env:
