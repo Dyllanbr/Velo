@@ -1,4 +1,5 @@
 import { test, expect, orderFixture, fillCheckout } from '../support/mock';
+import { OrderLookupPage } from '../support/pages/OrderLookupPage';
 
 test.describe('Consulta de pedidos', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,8 +16,8 @@ test.describe('Consulta de pedidos', () => {
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
       await route.fulfill({ json: [order] });
     });
-    await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(`  ${order.order_number.toLowerCase()}  `);
-    await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+    const orderLookupPage = new OrderLookupPage(page);
+    await orderLookupPage.searchOrder(`  ${order.order_number.toLowerCase()}  `);
     const orderGroup = page.getByRole('paragraph')
       .filter({ hasText: /^Pedido$/ })
       .locator('..');
@@ -53,8 +54,8 @@ test.describe('Consulta de pedidos', () => {
 
   test('consulta informa quando não há pedido', async ({ page }) => {
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
-    await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderFixture().order_number);
-    await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+    const orderLookupPage = new OrderLookupPage(page);
+    await orderLookupPage.searchOrder(orderFixture().order_number);
     const notFoundHeading = page.getByRole('heading', {
       name: 'Pedido não encontrado', exact: true, level: 3,
     });
