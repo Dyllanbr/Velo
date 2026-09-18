@@ -8,31 +8,6 @@ const outcomes = [
   { status: 'pending', message: 'Consulte o atendimento para confirmar este status.' },
 ] as const;
 
-const expectedPresentations = {
-  APROVADO: {
-    backgroundClass: /(?:^|\s)bg-green-100(?:\s|$)/,
-    textClass: /(?:^|\s)text-green-700(?:\s|$)/,
-    backgroundColor: 'rgb(220, 252, 231)',
-    color: 'rgb(21, 128, 61)',
-    iconClass: /(?:^|\s)lucide-circle-check-big(?:\s|$)/,
-  },
-  REPROVADO: {
-    backgroundClass: /(?:^|\s)bg-red-100(?:\s|$)/,
-    textClass: /(?:^|\s)text-red-700(?:\s|$)/,
-    backgroundColor: 'rgb(254, 226, 226)',
-    color: 'rgb(185, 28, 28)',
-    iconClass: /(?:^|\s)lucide-circle-x(?:\s|$)/,
-  },
-  EM_ANALISE: {
-    backgroundClass: /(?:^|\s)bg-amber-100(?:\s|$)/,
-    textClass: /(?:^|\s)text-amber-700(?:\s|$)/,
-    backgroundColor: 'rgb(254, 243, 199)',
-    color: 'rgb(180, 83, 9)',
-    iconClass: /(?:^|\s)lucide-clock(?:\s|$)/,
-  },
-  pending: null,
-} as const;
-
 for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
   test(`consulta preserva o status ${outcome.status} retornado pela API`, async ({ page }, testInfo) => {
     const order = { ...orderFixture(), status: outcome.status };
@@ -53,22 +28,7 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
     await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
     expect(requests).toEqual(['GET']);
 
-    const resultCard = page.getByTestId(`order-result-${order.order_number}`);
-    const statusBadge = resultCard.getByRole('status');
-    await expect(statusBadge).toHaveCount(1);
-    await expect(statusBadge).toBeVisible();
-    await expect(statusBadge).toHaveText(order.status);
-    const presentation = expectedPresentations[outcome.status];
-    if (presentation) {
-      await expect(statusBadge).toHaveClass(presentation.backgroundClass);
-      await expect(statusBadge).toHaveClass(presentation.textClass);
-      await expect(statusBadge).toHaveCSS('background-color', presentation.backgroundColor);
-      await expect(statusBadge).toHaveCSS('color', presentation.color);
-      const statusIcon = statusBadge.locator('svg');
-      await expect(statusIcon).toHaveCount(1);
-      await expect(statusIcon).toHaveAttribute('aria-hidden', 'true');
-      await expect(statusIcon).toHaveClass(presentation.iconClass);
-    }
+    await orderLookupPage.validateStatusBadge(order.order_number, outcome.status);
 
     await testInfo.attach('consulta.png', {
       contentType: 'image/png', body: await page.screenshot({ animations: 'disabled' }),
@@ -87,7 +47,7 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
 test('consulta preserva o status REPROVADO retornado pela API', async ({ page }, testInfo) => {
   const order = {
     ...orderFixture(),
-    status: 'REPROVADO',
+    status: 'REPROVADO' as const,
     color: 'midnight-black',
     wheel_type: 'sport',
     optionals: ['precision-park', 'flux-capacitor'],
@@ -119,19 +79,7 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
   expect(requests).toEqual(['GET']);
 
   const resultCard = page.getByTestId(`order-result-${order.order_number}`);
-  const statusBadge = resultCard.getByRole('status');
-  await expect(statusBadge).toHaveCount(1);
-  await expect(statusBadge).toBeVisible();
-  await expect(statusBadge).toHaveText(order.status);
-  const presentation = expectedPresentations.REPROVADO;
-  await expect(statusBadge).toHaveClass(presentation.backgroundClass);
-  await expect(statusBadge).toHaveClass(presentation.textClass);
-  await expect(statusBadge).toHaveCSS('background-color', presentation.backgroundColor);
-  await expect(statusBadge).toHaveCSS('color', presentation.color);
-  const statusIcon = statusBadge.locator('svg');
-  await expect(statusIcon).toHaveCount(1);
-  await expect(statusIcon).toHaveAttribute('aria-hidden', 'true');
-  await expect(statusIcon).toHaveClass(presentation.iconClass);
+  await orderLookupPage.validateStatusBadge(order.order_number, order.status);
 
   // Partial snapshot: interior/store persistence has known gaps; date checks format only.
   await expect(resultCard).toMatchAriaSnapshot(String.raw`
