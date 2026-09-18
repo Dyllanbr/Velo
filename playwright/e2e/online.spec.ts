@@ -5,7 +5,7 @@ test('página inicial e navegação para consulta', async ({ page }) => {
   await expect(page).toHaveTitle(/Velô by Papito/);
   await expect(page.getByTestId('hero-section').getByRole('heading')).toContainText('Velô Sprint');
   await page.getByRole('link', { name: 'Consultar Pedido' }).click();
-  await expect(page.getByTestId('search-order-button')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Buscar Pedido', exact: true })).toBeDisabled();
 });
 
 test('configuração atualiza preço e persiste após recarregar', async ({ page }) => {

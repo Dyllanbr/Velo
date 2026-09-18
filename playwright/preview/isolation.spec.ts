@@ -63,8 +63,8 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
   expect(productionRows).toEqual([]);
   expect(await lookup(request, settings.productionURL, settings.productionKey, 'customer_email', email)).toEqual([]);
   await page.goto('/lookup');
-  await page.getByTestId('search-order-id').fill(orderNumber);
-  await page.getByTestId('search-order-button').click();
+  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderNumber);
+  await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
   await expect(page.getByTestId(`order-result-${orderNumber}`)).toContainText(email);
   expect(blocked).toEqual([]);
   expect([...backendOrigins]).toEqual([settings.previewURL]);
