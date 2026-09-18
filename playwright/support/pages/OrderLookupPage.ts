@@ -1,5 +1,17 @@
 import { expect, type Page } from '@playwright/test';
 
+type OrderStatus = 'APROVADO' | 'REPROVADO' | 'EM_ANALISE' | 'pending';
+
+export type OrderDetails = {
+  number: string;
+  status: OrderStatus;
+  color: string;
+  wheels: string;
+  customer: { name: string; email: string };
+  payment: string;
+  price: string;
+};
+
 export class OrderLookupPage {
   constructor(private readonly page: Page) {}
 
@@ -8,9 +20,47 @@ export class OrderLookupPage {
     await this.page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
   }
 
+  async validateOrderDetails(order: OrderDetails) {
+    // Partial snapshot: interior/store persistence has known gaps; date checks format only.
+    await expect(this.page.getByTestId(`order-result-${order.number}`)).toMatchAriaSnapshot(String.raw`
+      - paragraph: Pedido
+      - paragraph: ${order.number}
+      - status:
+        - text: ${order.status}
+      - img "Velô Sprint"
+      - paragraph: Modelo
+      - paragraph: Velô Sprint
+      - paragraph: Cor
+      - paragraph: ${order.color}
+      - paragraph: Rodas
+      - paragraph: ${order.wheels}
+      - heading "Dados do Cliente" [level=4]
+      - paragraph: Nome
+      - paragraph: ${order.customer.name}
+      - paragraph: Email
+      - paragraph: ${order.customer.email}
+      - paragraph: Data do Pedido
+      - paragraph: /\d{2}\/\d{2}\/\d{4}/
+      - heading "Pagamento" [level=4]
+      - paragraph: ${order.payment}
+      - paragraph: ${order.price}
+    `);
+  }
+
+  async validateOrderNotFound() {
+    const heading = this.page.getByRole('heading', {
+      name: 'Pedido não encontrado', exact: true, level: 3,
+    });
+    await expect(heading).toBeVisible();
+    await expect(heading.locator('..')).toMatchAriaSnapshot(`
+      - heading "Pedido não encontrado" [level=3]
+      - paragraph: Verifique o número do pedido e tente novamente
+    `);
+  }
+
   async validateStatusBadge(
     orderNumber: string,
-    status: 'APROVADO' | 'REPROVADO' | 'EM_ANALISE' | 'pending',
+    status: OrderStatus,
   ) {
     const expectedPresentations = {
       APROVADO: {

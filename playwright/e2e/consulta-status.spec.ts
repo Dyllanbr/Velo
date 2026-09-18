@@ -1,5 +1,5 @@
 import { test, expect, orderFixture } from '../support/mock';
-import { OrderLookupPage } from '../support/pages/OrderLookupPage';
+import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
 
 const outcomes = [
   { status: 'APROVADO', message: null },
@@ -55,9 +55,12 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
     payment_method: 'avista',
     total_price: 52500,
   };
-  const expected = {
+  const expected: OrderDetails = {
+    number: order.order_number,
+    status: order.status,
     color: 'Midnight Black',
     wheels: 'sport Wheels',
+    customer: { name: order.customer_name, email: order.customer_email },
     payment: 'À Vista',
     price: 'R$ 52.500,00',
   };
@@ -78,33 +81,9 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
   await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
   expect(requests).toEqual(['GET']);
 
-  const resultCard = page.getByTestId(`order-result-${order.order_number}`);
   await orderLookupPage.validateStatusBadge(order.order_number, order.status);
 
-  // Partial snapshot: interior/store persistence has known gaps; date checks format only.
-  await expect(resultCard).toMatchAriaSnapshot(String.raw`
-    - paragraph: Pedido
-    - paragraph: ${order.order_number}
-    - status:
-      - text: ${order.status}
-    - img "Velô Sprint"
-    - paragraph: Modelo
-    - paragraph: Velô Sprint
-    - paragraph: Cor
-    - paragraph: ${expected.color}
-    - paragraph: Rodas
-    - paragraph: ${expected.wheels}
-    - heading "Dados do Cliente" [level=4]
-    - paragraph: Nome
-    - paragraph: ${order.customer_name}
-    - paragraph: Email
-    - paragraph: ${order.customer_email}
-    - paragraph: Data do Pedido
-    - paragraph: /\d{2}\/\d{2}\/\d{4}/
-    - heading "Pagamento" [level=4]
-    - paragraph: ${expected.payment}
-    - paragraph: ${expected.price}
-  `);
+  await orderLookupPage.validateOrderDetails(expected);
   for (const other of outcomes.filter((item) => item.status !== 'REPROVADO')) {
     await expect(page.getByText(other.status, { exact: true })).toHaveCount(0);
     if (other.message) await expect(page.getByText(other.message, { exact: true })).toHaveCount(0);

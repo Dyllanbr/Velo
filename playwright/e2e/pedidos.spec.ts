@@ -1,5 +1,5 @@
 import { test, expect, orderFixture, fillCheckout } from '../support/mock';
-import { OrderLookupPage } from '../support/pages/OrderLookupPage';
+import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
 
 test.describe('Consulta de pedidos', () => {
   test.beforeEach(async ({ page }) => {
@@ -11,6 +11,15 @@ test.describe('Consulta de pedidos', () => {
 
   test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page }) => {
     const order = orderFixture();
+    const expected: OrderDetails = {
+      number: order.order_number,
+      status: 'APROVADO',
+      color: 'Glacier Blue',
+      wheels: 'aero Wheels',
+      customer: { name: order.customer_name, email: order.customer_email },
+      payment: 'À Vista',
+      price: 'R$ 40.000,00',
+    };
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
       expect(route.request().method()).toBe('GET');
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
@@ -25,45 +34,29 @@ test.describe('Consulta de pedidos', () => {
     await expect(page.getByText('APROVADO', { exact: true })).toBeVisible();
     await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
 
-    // Partial snapshot: interior/store persistence has known gaps; date checks format only.
-    const resultCard = page.getByTestId(`order-result-${order.order_number}`);
-    await expect(resultCard).toMatchAriaSnapshot(String.raw`
-      - paragraph: Pedido
-      - paragraph: ${order.order_number}
-      - status:
-        - text: ${order.status}
-      - img "Velô Sprint"
-      - paragraph: Modelo
-      - paragraph: Velô Sprint
-      - paragraph: Cor
-      - paragraph: Glacier Blue
-      - paragraph: Rodas
-      - paragraph: aero Wheels
-      - heading "Dados do Cliente" [level=4]
-      - paragraph: Nome
-      - paragraph: ${order.customer_name}
-      - paragraph: Email
-      - paragraph: ${order.customer_email}
-      - paragraph: Data do Pedido
-      - paragraph: /\d{2}\/\d{2}\/\d{4}/
-      - heading "Pagamento" [level=4]
-      - paragraph: À Vista
-      - paragraph: R$ 40.000,00
-    `);
+    await orderLookupPage.validateOrderDetails(expected);
   });
 
   test('consulta informa quando não há pedido', async ({ page }) => {
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
     const orderLookupPage = new OrderLookupPage(page);
     await orderLookupPage.searchOrder(orderFixture().order_number);
-    const notFoundHeading = page.getByRole('heading', {
-      name: 'Pedido não encontrado', exact: true, level: 3,
+    await orderLookupPage.validateOrderNotFound();
+  });
+
+  test('consulta informa quando o código está fora do padrão', async ({ page }) => {
+    const orderCode = 'XYZ-999-INVALIDO';
+    const requests: string[] = [];
+    await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
+      requests.push(route.request().method());
+      expect(route.request().method()).toBe('GET');
+      expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${orderCode}`);
+      await route.fulfill({ json: [] });
     });
-    await expect(notFoundHeading).toBeVisible();
-    await expect(notFoundHeading.locator('..')).toMatchAriaSnapshot(`
-      - heading "Pedido não encontrado" [level=3]
-      - paragraph: Verifique o número do pedido e tente novamente
-    `);
+    const orderLookupPage = new OrderLookupPage(page);
+    await orderLookupPage.searchOrder(`  ${orderCode.toLowerCase()}  `);
+    await orderLookupPage.validateOrderNotFound();
+    expect(requests).toEqual(['GET']);
   });
 });
 
