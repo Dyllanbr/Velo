@@ -10,8 +10,11 @@ test('consulta normaliza número e exibe pedido aprovado criado pelo próprio te
   await page.goto('/lookup');
   await page.getByTestId('search-order-id').fill(`  ${order.order_number.toLowerCase()}  `);
   await page.getByTestId('search-order-button').click();
-  await expect(page.getByTestId(`order-result-${order.order_number}`)).toContainText('APROVADO');
-  await expect(page.getByTestId(`order-result-${order.order_number}`)).toContainText(order.customer_email);
+  const result = page.getByTestId(`order-result-${order.order_number}`);
+  await expect(result).toBeVisible();
+  await expect(result).toContainText(order.order_number);
+  await expect(result).toContainText('APROVADO');
+  await expect(result).toContainText(order.customer_email);
 });
 
 test('consulta informa quando não há pedido', async ({ page }) => {
