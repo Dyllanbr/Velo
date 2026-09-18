@@ -1,29 +1,68 @@
 import { test, expect, orderFixture, fillCheckout } from '../support/mock';
 
-test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page }) => {
-  const order = orderFixture();
-  await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
-    expect(route.request().method()).toBe('GET');
-    expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
-    await route.fulfill({ json: [order] });
+test.describe('Consulta de pedidos', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/lookup');
+    await expect(page.getByRole('heading', {
+      name: 'Consultar Pedido', exact: true, level: 3,
+    })).toBeVisible();
   });
-  await page.goto('/lookup');
-  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(`  ${order.order_number.toLowerCase()}  `);
-  await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
-  const orderGroup = page.getByRole('paragraph')
-    .filter({ hasText: /^Pedido$/ })
-    .locator('..');
-  await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('APROVADO', { exact: true })).toBeVisible();
-  await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
-});
 
-test('consulta informa quando não há pedido', async ({ page }) => {
-  await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
-  await page.goto('/lookup');
-  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderFixture().order_number);
-  await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Pedido não encontrado' })).toBeVisible();
+  test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page }) => {
+    const order = orderFixture();
+    await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
+      expect(route.request().method()).toBe('GET');
+      expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
+      await route.fulfill({ json: [order] });
+    });
+    await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(`  ${order.order_number.toLowerCase()}  `);
+    await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+    const orderGroup = page.getByRole('paragraph')
+      .filter({ hasText: /^Pedido$/ })
+      .locator('..');
+    await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('APROVADO', { exact: true })).toBeVisible();
+    await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
+
+    // Partial snapshot: interior/store persistence has known gaps; date checks format only.
+    const resultCard = page.getByTestId(`order-result-${order.order_number}`);
+    await expect(resultCard).toMatchAriaSnapshot(String.raw`
+      - paragraph: Pedido
+      - paragraph: ${order.order_number}
+      - text: ${order.status}
+      - img "Velô Sprint"
+      - paragraph: Modelo
+      - paragraph: Velô Sprint
+      - paragraph: Cor
+      - paragraph: Glacier Blue
+      - paragraph: Rodas
+      - paragraph: aero Wheels
+      - heading "Dados do Cliente" [level=4]
+      - paragraph: Nome
+      - paragraph: ${order.customer_name}
+      - paragraph: Email
+      - paragraph: ${order.customer_email}
+      - paragraph: Data do Pedido
+      - paragraph: /\d{2}\/\d{2}\/\d{4}/
+      - heading "Pagamento" [level=4]
+      - paragraph: À Vista
+      - paragraph: R$ 40.000,00
+    `);
+  });
+
+  test('consulta informa quando não há pedido', async ({ page }) => {
+    await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
+    await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderFixture().order_number);
+    await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+    const notFoundHeading = page.getByRole('heading', {
+      name: 'Pedido não encontrado', exact: true, level: 3,
+    });
+    await expect(notFoundHeading).toBeVisible();
+    await expect(notFoundHeading.locator('..')).toMatchAriaSnapshot(`
+      - heading "Pedido não encontrado" [level=3]
+      - paragraph: Verifique o número do pedido e tente novamente
+    `);
+  });
 });
 
 test('checkout incompleto não envia pedido', async ({ page }) => {
