@@ -149,7 +149,9 @@ Score exatamente 700 fica `EM_ANALISE`, inclusive com entrada de pelo menos 50%.
 
 A [função de crédito](supabase/functions/credit-analysis/index.ts) aceita uma URL configurada e possui um fallback UAT. O Bearer gerado no código é um token aleatório de simulação; a integração externa ainda depende de contrato e autenticação válidos. Os testes com respostas simuladas e o preflight de corpo vazio não comprovam uma consulta real ao provedor.
 
-Limitação visual atual: a [confirmação](src/pages/Success.tsx) mostra “Crédito Reprovado” para todo status diferente de `APROVADO`, incluindo `EM_ANALISE`. A consulta preserva o texto do status, mas também usa estilo negativo para os não aprovados. Isso precisa ser corrigido na apresentação; `EM_ANALISE` continua sendo um resultado distinto da decisão de crédito.
+A [confirmação](src/pages/Success.tsx) distingue os três resultados: aprovação, reprovação e crédito em análise. O estado `EM_ANALISE` usa relógio, apresentação neutra e mensagem de que o pedido aguarda análise; não é apresentado como reprovação. Os testes locais percorrem o checkout com scores simulados 800, 400 e 600, conferindo o status enviado e a mensagem resultante sem alterar as regras de decisão.
+
+Limitação visual ainda presente na consulta: ela preserva o texto do status, mas usa estilo negativo para os não aprovados. Essa apresentação continua pendente de revisão; `EM_ANALISE` é um resultado distinto de reprovação.
 
 ---
 
