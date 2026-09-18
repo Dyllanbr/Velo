@@ -8,7 +8,7 @@ test('consulta normaliza número e exibe pedido aprovado criado pelo próprio te
     await route.fulfill({ json: [order] });
   });
   await page.goto('/lookup');
-  await page.getByTestId('search-order-id').fill(`  ${order.order_number.toLowerCase()}  `);
+  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(`  ${order.order_number.toLowerCase()}  `);
   await page.getByTestId('search-order-button').click();
   const result = page.getByTestId(`order-result-${order.order_number}`);
   await expect(result).toBeVisible();
@@ -20,7 +20,7 @@ test('consulta normaliza número e exibe pedido aprovado criado pelo próprio te
 test('consulta informa quando não há pedido', async ({ page }) => {
   await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
   await page.goto('/lookup');
-  await page.getByTestId('search-order-id').fill(orderFixture().order_number);
+  await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderFixture().order_number);
   await page.getByTestId('search-order-button').click();
   await expect(page.getByRole('heading', { name: 'Pedido não encontrado' })).toBeVisible();
 });
