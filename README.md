@@ -75,7 +75,7 @@ Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para co
 
 ## Estado do desafio
 
-O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. A implementação do commit `74c98be` passou no check de qualidade da [execução 35299625566](https://github.com/Dyllanbr/Velo/actions/runs/35299625566); o preview parou no guard de configuração, antes do deploy e do E2E real. Isso ainda não comprova isolamento remoto nem publicação em produção.
+O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. Na verificação de 18/09/2026, o commit `7b0cd1c` passou nos checks do [PR (execução 35316716372)](https://github.com/Dyllanbr/Velo/actions/runs/35316716372). Na [execução de push 35316712267](https://github.com/Dyllanbr/Velo/actions/runs/35316712267), a qualidade passou e o preview parou no guard de configuração, antes do deploy e do E2E real. Isso ainda não comprova isolamento remoto nem publicação em produção.
 
 O projeto Vercel foi criado e recebeu as variáveis de produção. Restam o Supabase de preview, o token de CI e a configuração remota completa. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
 
@@ -115,37 +115,51 @@ src/
 - **Rodas Sport:** +R$ 2.000
 - **Precision Park:** +R$ 5.500
 - **Flux Capacitor:** +R$ 5.000
-- **Financiamento:** 12x com juros de 2% a.m.
+- **Financiamento no checkout atual:** 12 parcelas de `(max(0, preço - entrada) / 12) × 1,02`. O total é a entrada somada às 12 parcelas.
+
+Há uma divergência conhecida: o [checkout](src/pages/Order.tsx) aplica o fator 1,02 uma única vez sobre o saldo, enquanto o helper `calculateInstallment` no [store](src/store/configuratorStore.ts) usa uma fórmula de prestação constante com taxa de 2% por período, em 12 períodos. Esse helper não é chamado pelo checkout. A regra financeira precisa ser reconciliada com os requisitos antes de apresentar uma fórmula como definitiva.
 
 ---
 
 ## Banco de Dados
 
 **Tabela `orders`** — campos principais:
-- `order_number` — Formato: VLO-XXXXXX
+- `order_number` — Gerado pelo cliente como VLO- seguido de seis letras maiúsculas/números; o banco exige unicidade, mas não valida esse formato
 - `color`, `wheel_type`, `optionals` — Configuração
 - `customer_name`, `customer_email`, `customer_cpf` — Cliente
 - `payment_method`, `total_price` — Pagamento
-- `status` — pending, approved, rejected, analysis
+- `status` — O fluxo da aplicação grava `APROVADO`, `REPROVADO` ou `EM_ANALISE`. A coluna é `TEXT`, sem restrição desses valores, e a migração inicial ainda define o default histórico `pending`
+
+Entrada e valor da parcela não são persistidos separadamente no modelo atual. No financiamento, `total_price` recebe a entrada somada às parcelas calculadas pelo checkout. A parcela aparece na confirmação imediata porque é acrescentada ao objeto em memória; uma nova consulta não a recupera do banco.
 
 ---
 
 ## Análise de Crédito
 
-| Score | Resultado |
-|-------|-----------|
-| > 700 | Aprovado |
-| 501-700 | Em análise |
-| ≤ 500 | Reprovado |
+A análise é solicitada apenas no financiamento. A Edge Function obtém o score, e o checkout decide o status nesta ordem:
 
-*Se entrada ≥ 50% do total, aprova mesmo com score < 700*
+| Condição, em ordem de avaliação | Status |
+|--------------------------------|--------|
+| Entrada ≥ 50% e score < 700 | `APROVADO` |
+| Score > 700 | `APROVADO` |
+| Score entre 501 e 700, inclusive | `EM_ANALISE` |
+| Demais casos | `REPROVADO` |
+
+Score exatamente 700 fica `EM_ANALISE`, inclusive com entrada de pelo menos 50%. Em falha da consulta ou resposta sem score numérico, o fluxo mostra erro e não cria o pedido.
+
+A [função de crédito](supabase/functions/credit-analysis/index.ts) aceita uma URL configurada e possui um fallback UAT. O Bearer gerado no código é um token aleatório de simulação; a integração externa ainda depende de contrato e autenticação válidos. Os testes com respostas simuladas e o preflight de corpo vazio não comprovam uma consulta real ao provedor.
+
+Limitação visual atual: a [confirmação](src/pages/Success.tsx) mostra “Crédito Reprovado” para todo status diferente de `APROVADO`, incluindo `EM_ANALISE`. A consulta preserva o texto do status, mas também usa estilo negativo para os não aprovados. Isso precisa ser corrigido na apresentação; `EM_ANALISE` continua sendo um resultado distinto da decisão de crédito.
 
 ---
 
 ## Fluxo Principal
 
 ```
-Landing → Configurador → Checkout → Análise de Crédito → Confirmação
+Landing → Configurador → Checkout
+                           ├─ À vista → Criar pedido → Confirmação
+                           └─ Financiamento → Consultar score → Decidir status
+                                                                └─ Criar pedido → Confirmação
 ```
 
 ---
