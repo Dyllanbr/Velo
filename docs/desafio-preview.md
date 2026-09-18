@@ -49,14 +49,33 @@ Use a CLI já presente nas dependências. Antes de cada vínculo, confira o ref 
 
 ```powershell
 # Execute somente depois de criar o projeto e conferir o seu ref.
+. 'D:\Projetos\Automatiza-Ai\Iniciar-Ambiente.ps1'
+$projectDir = 'D:\Projetos\Velo'
+$supabaseCli = Join-Path $projectDir 'node_modules\.bin\supabase.cmd'
 $previewRef = '<ref-do-projeto-preview>'
+if ($previewRef -notmatch '^[a-z]{20}$') { throw 'Informe um ref válido de preview' }
 if ($previewRef -eq 'zbfdffxonoztoydpdlru') { throw 'Destino de produção bloqueado' }
-yarn supabase link --project-ref $previewRef
-yarn supabase db push --dry-run
+
+function Assert-PreviewLink {
+  $refPath = Join-Path $projectDir 'supabase\.temp\project-ref'
+  $linkedRef = (Get-Content -LiteralPath $refPath -Raw -ErrorAction Stop).Trim()
+  if ($linkedRef -ne $previewRef) { throw 'Projeto vinculado difere do preview esperado' }
+}
+
+& $supabaseCli link --workdir $projectDir --project-ref $previewRef
+if ($LASTEXITCODE -ne 0) { throw 'Link falhou; nenhuma migração deve ser aplicada' }
+Assert-PreviewLink
+& $supabaseCli db push --workdir $projectDir --linked --dry-run
+if ($LASTEXITCODE -ne 0) { throw 'Dry-run falhou; aplicação interrompida' }
 # Confira as migrações listadas e então aplique no projeto de preview.
-yarn supabase db push
-yarn supabase functions deploy --project-ref $previewRef
+Assert-PreviewLink
+& $supabaseCli db push --workdir $projectDir --linked
+if ($LASTEXITCODE -ne 0) { throw 'Migração falhou; deploy de funções interrompido' }
+& $supabaseCli functions deploy --workdir $projectDir --project-ref $previewRef
+if ($LASTEXITCODE -ne 0) { throw 'Deploy de funções falhou; preparação incompleta' }
 ```
+
+Esse roteiro Windows usa a CLI já instalada no projeto e verifica o vínculo salvo antes de cada `db push`. Em PowerShell, uma falha de um programa externo não interrompe necessariamente as linhas seguintes; por isso os códigos de saída são conferidos explicitamente. Os comandos acima ainda não foram executados contra um novo preview. Não execute outro `supabase link` concorrente nesse diretório durante a aplicação.
 
 Em produção, a conferência somente de metadados encontrou os efeitos das quatro migrações: criação de `orders`/RLS/trigger (`20251221161820`), adição de `optionals` (`20251221163213`), remoção de `interior_color` (`20251221205335`) e renomeação de `exterior_color` para `color` (`20251221205414`). O histórico remoto foi listado sem versões. Isso não informa quem aplicou o schema nem por qual mecanismo; reaplicar cegamente tentaria criar objetos existentes.
 
@@ -65,6 +84,8 @@ Essa divergência entre schema e histórico continua pendente de reconciliação
 Confirme nas duas plataformas que as funções usadas pelo checkout estão disponíveis. O E2E de preview agora envia `{}` para `credit-analysis` e exige HTTP 400 com `CPF é obrigatório`, antes de criar o pedido. Esse corpo alcança a validação inicial do handler local antes da chamada externa, comportamento coberto por teste. Um 401, 404 ou contrato diferente interrompe o E2E. O resultado é anexado ao relatório sem credenciais. Essa checagem mínima não substitui a comparação do código e da configuração das funções entre os dois projetos.
 
 Políticas RLS determinam o que a chave pública pode ver: HTTP 200 com `[]` também pode significar linhas ocultas. A auditoria inicial encontrou SELECT `USING (true)`, mas a prova final deve incluir uma nova comparação de policies e a conferência do identificador sintético por leitura privilegiada, junto ao run remoto. Essa coleta será feita fora do CI com acesso existente, sem acrescentar uma credencial administrativa ao GitHub. Uma falha de permissão ou uma consulta pública vazia sem essa evidência não comprova ausência.
+
+O workflow não consome essa auditoria externa como condição automática de promoção. A sincronização de schema/funções/RLS e a leitura privilegiada precisam ser preservadas como evidências complementares do aceite, relacionadas ao run real. Um job verde sozinho não comprova esses itens.
 
 ## Configurar Vercel
 
@@ -110,6 +131,8 @@ Depois de resolver as pendências de configuração, execute novamente o workflo
 O pedido de teste permanece identificado em preview como evidência. Não há limpeza destrutiva automática. Os testes não criam pedidos em produção. Se for necessário limpar preview depois da gravação, remova apenas os identificadores explicitamente registrados pela execução.
 
 Depois do merge na `main`, a pipeline repete preview/E2E no SHA resultante do merge e só então publica produção. Confira no summary o SHA aprovado, abra o deploy Current na Vercel e inspecione a requisição Supabase no navegador: o hostname precisa ser o de produção. `/build-info.json` deve informar `environment: production` e o mesmo SHA. O workflow verifica o bundle staged por HTTP, mas a confirmação visual do domínio final faz parte da demonstração.
+
+A conferência do bundle e do hostname comprova a configuração do destino, não uma escrita efetivamente persistida. O critério de leitura/escrita após o promote precisa de evidência própria de uma operação da aplicação e sua posterior consulta em produção, distinguida dos E2E que continuam restritos ao preview. Nenhuma operação desse tipo foi realizada nesta entrega até este retrato.
 
 Para um vídeo curto, mostre: projetos Supabase distintos; variáveis Vercel com valores de chave ocultos; execução verde e SHA; pedido único existente no preview e ausente em produção; deploy de produção apontando para seu Supabase; PR com a justificativa dos dois builds.
 
