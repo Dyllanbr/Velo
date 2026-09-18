@@ -2,6 +2,17 @@
 export const KNOWN_PRODUCTION_REF = 'zbfdffxonoztoydpdlru';
 type Environment = Record<string, string | undefined>;
 
+// Optional platform UI only. A matching request is aborted, never authorized
+// or fetched. Do not broaden this to a domain allowlist or other methods.
+export function isOptionalVercelToolbarRequest(request: {
+  url: string;
+  method: string;
+  resourceType: string;
+}): boolean {
+  return request.method === 'GET' && request.resourceType === 'script'
+    && request.url === 'https://vercel.live/_next-live/feedback/feedback.js';
+}
+
 function required(env: Environment, name: string): string {
   const value = env[name]?.trim();
   if (!value) throw new Error(`Integração preview bloqueada: falta ${name}.`);

@@ -1,8 +1,9 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { assertPreviewBuild, previewSettings } from '../../src/lib/preview-safety';
+import { assertPreviewBuild, isOptionalVercelToolbarRequest, previewSettings } from '../../src/lib/preview-safety';
 import { checkPreviewCreditFunction } from '../../src/lib/preview-credit-preflight';
 import { fillCheckout } from '../support/mock';
+import { fulfillProtectedAppRoute } from '../support/protected-app-route';
 
 const settings = previewSettings(process.env);
 
@@ -23,7 +24,7 @@ async function lookup(request: APIRequestContext, origin: string, key: string, c
 test('pedido criado no preview aparece no preview e está ausente em produção', async ({ page, request }, testInfo) => {
   const runId = randomUUID();
   const email = `e2e-preview-${runId}@example.invalid`;
-  const appHeaders = settings.bypassSecret ? { 'x-vercel-protection-bypass': settings.bypassSecret } : {};
+  const appHeaders: Record<string, string> = settings.bypassSecret ? { 'x-vercel-protection-bypass': settings.bypassSecret } : {};
   const markerResponse = await request.get(`${settings.baseURL}/build-info.json`, {
     headers: appHeaders, maxRedirects: 0,
   });
@@ -39,14 +40,29 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
   expect(await lookup(request, settings.productionURL, settings.productionKey, 'customer_email', email)).toEqual([]);
   const blocked: string[] = [];
   const backendOrigins = new Set<string>();
+  const suppressedPlatformScripts: Array<{ url: string; method: string; resourceType: string; action: string }> = [];
+  const blockedAppRedirects: Array<{ origin: string; status: number; action: string }> = [];
   await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
+    const request = route.request();
+    const url = new URL(request.url());
     if (url.origin === settings.baseURL) {
-      return route.continue({ headers: { ...route.request().headers(), ...appHeaders } });
+      return fulfillProtectedAppRoute(route, settings.baseURL, appHeaders, async (status) => {
+        blocked.push(url.origin);
+        const evidence = { origin: url.origin, status, action: 'abort' };
+        blockedAppRedirects.push(evidence);
+        await testInfo.attach('blocked-app-redirect.json', {
+          contentType: 'application/json', body: JSON.stringify(evidence, null, 2),
+        });
+      });
     }
     if (url.origin === settings.previewURL) {
       backendOrigins.add(url.origin);
       return route.continue();
+    }
+    const descriptor = { url: request.url(), method: request.method(), resourceType: request.resourceType() };
+    if (isOptionalVercelToolbarRequest(descriptor)) {
+      suppressedPlatformScripts.push({ ...descriptor, action: 'abort' });
+      return route.abort();
     }
     if (!['fonts.googleapis.com', 'fonts.gstatic.com'].includes(url.hostname)) blocked.push(url.origin);
     await route.abort();
@@ -66,6 +82,10 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
   await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderNumber);
   await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
   await expect(page.getByTestId(`order-result-${orderNumber}`)).toContainText(email);
+  const browserNetwork = { blockedOrigins: blocked, backendOrigins: [...backendOrigins], suppressedPlatformScripts, blockedAppRedirects };
+  await testInfo.attach('browser-network-evidence.json', {
+    contentType: 'application/json', body: JSON.stringify(browserNetwork, null, 2),
+  });
   expect(blocked).toEqual([]);
   expect([...backendOrigins]).toEqual([settings.previewURL]);
   await testInfo.attach('isolation-evidence.json', {
@@ -73,7 +93,7 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
     body: JSON.stringify({ runId, sha: marker.sha, deployment: settings.baseURL,
       previewRef: settings.previewRef, productionRef: settings.productionRef,
       orderNumber, previewCount: previewRows.length, productionCount: productionRows.length,
-      creditPreflight,
+      creditPreflight, browserNetwork,
       checkedAt: new Date().toISOString(),
       note: 'Dados sintéticos permanecem no preview como evidência; produção recebeu somente GET.' }, null, 2),
   });

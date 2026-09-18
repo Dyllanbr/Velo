@@ -6,6 +6,9 @@ import { assertBundle, validateConfig } from './ci-guards.mjs';
 
 const INITIAL_MARKER_WINDOW_MS = 15_000;
 const INITIAL_MARKER_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+// Platform-injected toolbar, documented by Vercel. Exact raw URL only: no
+// aliases, query strings, credentials, fragments, or normalization shortcuts.
+const VERCEL_TOOLBAR_SCRIPT = 'https://vercel.live/_next-live/feedback/feedback.js';
 
 // Read-only: never creates orders or writes to either database.
 export async function verifyDeployment(target, base, {
@@ -107,8 +110,24 @@ export async function verifyDeployment(target, base, {
   const html = await read('/');
   assert(html.includes('id="root"'), 'Deployment did not serve the Velo application.');
   const scripts = [...html.matchAll(/<script[^>]*\bsrc=["']([^"']+)["'][^>]*>/g)].map((match) => match[1]);
-  assert(scripts.length > 0, 'No JavaScript bundle found.');
-  const bundle = (await Promise.all(scripts.map((script) => read(script)))).join('\n');
+  const applicationScripts = [];
+  // Classify every source before fetching any bundle. Never fetch the toolbar
+  // or send the deployment bypass to an external host.
+  for (const script of scripts) {
+    if (script === VERCEL_TOOLBAR_SCRIPT) {
+      log('Ignored the exact Vercel Toolbar script; no external request was made.');
+      continue;
+    }
+    let url;
+    try { url = new URL(script, origin); } catch {
+      throw new Error('Invalid deployment script URL; source omitted.');
+    }
+    assert(url.origin === origin.origin, 'Only same-origin deployment assets can be read.');
+    assert(url.username + url.password === '', 'Asset URLs must not contain credentials.');
+    applicationScripts.push(script);
+  }
+  assert(applicationScripts.length > 0, 'No same-origin application JavaScript bundle found.');
+  const bundle = (await Promise.all(applicationScripts.map((script) => read(script)))).join('\n');
   assertBundle(bundle, config);
   for (const route of ['/configure', '/lookup']) {
     assert((await read(route)).includes('id="root"'), `SPA route ${route} is not available.`);

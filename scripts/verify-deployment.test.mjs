@@ -17,6 +17,7 @@ const env = {
 const marker = { sha: env.GITHUB_SHA, environment: 'preview', supabaseProjectRef: previewRef };
 const html = '<div id="root"></div><script src="/assets/app.js"></script>';
 const bundle = `${env.VITE_SUPABASE_URL} ${env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+const toolbar = 'https://vercel.live/_next-live/feedback/feedback.js';
 
 function harness(override = () => undefined) {
   const calls = [];
@@ -87,6 +88,64 @@ test('blocks a cross-origin asset before sending the bypass', async () => {
   ) : undefined);
   await assert.rejects(check.run(), /Only same-origin/);
   assert.equal(check.calls.length, 2);
+});
+
+test('ignores only the exact Vercel Toolbar source and still validates the application bundle', async () => {
+  const check = harness((url) => url.pathname === '/' ? new Response(
+    `<div id="root"></div><script type="module" src="/assets/app.js"></script><script src="${toolbar}"></script>`,
+  ) : undefined);
+  await check.run();
+  assert.deepEqual(check.calls.map(({ url }) => new URL(url).pathname), [
+    '/build-info.json', '/', '/assets/app.js', '/configure', '/lookup',
+  ]);
+  assert(check.calls.every(({ url }) => new URL(url).origin === base));
+  assert(check.logs.some((line) => line.includes('Ignored the exact Vercel Toolbar script')));
+  assert(!check.logs.join('\n').includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
+
+  const wrongBundle = harness((url) => url.pathname === '/' ? new Response(
+    `${html}<script src="${toolbar}"></script>`,
+  ) : url.pathname === '/assets/app.js' ? new Response(
+    `${bundle} https://${KNOWN_PRODUCTION_REF}.supabase.co`,
+  ) : undefined);
+  await assert.rejects(wrongBundle.run(), /other environment/);
+  assert(!wrongBundle.calls.some(({ url }) => new URL(url).pathname === '/configure'));
+});
+
+test('the toolbar alone cannot satisfy the requirement for an application bundle', async () => {
+  for (const scripts of ['', `<script src="${toolbar}"></script>`]) {
+    const check = harness((url) => url.pathname === '/' ? new Response(`<div id="root"></div>${scripts}`) : undefined);
+    await assert.rejects(check.run(), /No same-origin application JavaScript bundle/);
+    assert.equal(check.calls.length, 2);
+  }
+});
+
+test('rejects toolbar lookalikes, altered paths, queries and credentials before any bundle request', async () => {
+  const path = '/_next-live/feedback/feedback.js';
+  for (const script of [
+    `https://vercel.live.evil.invalid${path}`, `https://sub.vercel.live${path}`, `https://vercel-live.invalid${path}`,
+    `https://verce1.live${path}`, `https://vercel.live.${path}`, `https://%76ercel.live${path}`,
+    `http://vercel.live${path}`, `//vercel.live${path}`, `https://vercel.live:443${path}`,
+    `https://vercel.live:8443${path}`, `https://VERCEL.LIVE${path}`, `${toolbar}.evil`, `${toolbar}/`,
+    'https://vercel.live/_next-live/feedback/other.js', 'https://vercel.live/_next-live/feedback/%66eedback.js',
+    'https://vercel.live/_next-live/other/../feedback/feedback.js',
+    `${toolbar}?token=${env.VERCEL_AUTOMATION_BYPASS_SECRET}`, `${toolbar}#fragment`,
+    `https://user:${env.VERCEL_AUTOMATION_BYPASS_SECRET}@vercel.live${path}`,
+    `https://vercel.live@outside.invalid${path}`, `https://vercel.live\\@outside.invalid${path}`,
+  ]) {
+    // Include a valid bundle first: all sources must be classified before its
+    // request starts, so an unknown external script cannot race bundle reads.
+    const check = harness((url) => url.pathname === '/' ? new Response(
+      `${html}<script src="${script}"></script>`,
+    ) : undefined);
+    await assert.rejects(check.run(), (error) => {
+      assert.match(error.message, /Only same-origin|Invalid deployment script URL/);
+      assert(!error.message.includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
+      return true;
+    });
+    assert.equal(check.calls.length, 2);
+    assert(check.calls.every(({ url }) => new URL(url).origin === base));
+    assert(!check.logs.join('\n').includes(env.VERCEL_AUTOMATION_BYPASS_SECRET));
+  }
 });
 
 test('rejects wrong SHA, environment or database before fetching the application', async () => {
