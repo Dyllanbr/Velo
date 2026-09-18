@@ -1,6 +1,12 @@
 # Desafio: preview isolado e publicação verificável
 
-## Fotografia auditada da entrega — 18/09/2026
+## Aceite no domínio público — 18/09/2026
+
+O [resultado final do PR #2](https://github.com/Dyllanbr/Velo/pull/2) registra o aceite no domínio [velo-one-alpha.vercel.app](https://velo-one-alpha.vercel.app/) para o SHA `0e46bdd5181039960244284c5d5a5ee1101a6afe`, após o [run 35369214476](https://github.com/Dyllanbr/Velo/actions/runs/35369214476). A aplicação criou um pedido sintético à vista com um POST 201 e o consultou com GET 200. A auditoria SQL correlacionada confirmou presença em produção e ausência no preview, sem filtragem RLS ativa nas sessões de leitura. O pedido foi distinto daquele criado pelo E2E de preview. Não houve chamada de crédito nesse aceite.
+
+A publicação posterior da main `3aeccdebce59de2957593bc1bd403fd6dd855279`, [run 35372576984](https://github.com/Dyllanbr/Velo/actions/runs/35372576984), passou os três jobs com 94 unitários, 23 testes Node, 19 E2E locais e um E2E real no preview. O [PR #3](https://github.com/Dyllanbr/Velo/pull/3) reúne a verificação dessa publicação: ausência do seu pedido de preview em produção e leitura do domínio público com o marcador novo e hashes de HTML/script iguais aos do aceite 0e46bdd. A escrita em produção não foi repetida; seu recibo permanece associado ao SHA original. Novos commits exigem seus próprios resultados de CI e evidências correspondentes.
+
+## Fotografia histórica do primeiro promote — 18/09/2026
 
 O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) foi integrado à `main` no SHA [`98eb6bb6fa4d65f1d22e33229e72c4792561d9b5`](https://github.com/Dyllanbr/Velo/commit/98eb6bb6fa4d65f1d22e33229e72c4792561d9b5). A [execução 35367456549, tentativa 1](https://github.com/Dyllanbr/Velo/actions/runs/35367456549) concluiu os três jobs com sucesso: qualidade, preview/E2E e produção/promote. Esta seção descreve esse run e as evidências complementares preservadas; não representa monitoramento contínuo. O [PR #2 reúne o resultado final do aceite e seus recibos](https://github.com/Dyllanbr/Velo/pull/2).
 
