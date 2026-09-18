@@ -101,11 +101,11 @@ As três variáveis abaixo foram configuradas em **Preview** e **Production**. N
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | `https://bcsepghyrzmabmmdinuy.supabase.co` | `https://zbfdffxonoztoydpdlru.supabase.co` |
 | `VITE_SUPABASE_PROJECT_ID` | `bcsepghyrzmabmmdinuy` | `zbfdffxonoztoydpdlru` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | JWT público `anon` do preview | JWT público `anon` da produção, compatível com `verify_jwt: true` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | JWT público `anon` do preview | Chave pública `sb_publishable_*` de produção preservada na configuração |
 
 As três variáveis devem ter valores iguais aos respectivos valores do GitHub abaixo. O guard verifica os valores baixados da Vercel sem imprimir as chaves. Não crie outras variáveis `VITE_*` sem revisar o allowlist, pois elas são expostas ao navegador. Nunca use `service_role`, `sb_secret_*`, senha do banco ou access token como variável `VITE_*`.
 
-**Para o modelo atual da função, configure JWT público `anon` do respectivo projeto.** O nome `VITE_SUPABASE_PUBLISHABLE_KEY` não exige uma chave `sb_publishable_*`. `credit-analysis` usa `verify_jwt: true`; o preflight envia `Authorization: Bearer` somente para JWT e apenas `apikey` para publishable. O guard aceita os dois formatos públicos, mas isso não torna publishable intercambiável com JWT nesse fluxo. Antes de trocar para publishable, revise a autenticação equivalente dos dois projetos e comprove o contrato remoto; não desative a verificação apenas para obter um teste verde.
+O nome `VITE_SUPABASE_PUBLISHABLE_KEY` aceita os dois formatos públicos. A configuração observada usa JWT `anon` em preview e `sb_publishable_*` em produção; a chave opaca não possui role/ref decodificáveis, portanto seu vínculo exige conferir URL, projeto, bundle e resposta do serviço. `credit-analysis` usa `verify_jwt: true`; o preflight envia `Authorization: Bearer` somente para JWT e apenas `apikey` para publishable. Esse preflight foi executado no preview. O aceite de produção à vista não chama a função nem comprova compatibilidade dessa chave com o caminho de crédito. Revise e teste esse contrato antes de usar financiamento real, sem desativar a verificação apenas para obter um teste verde.
 
 Se Deployment Protection estiver habilitado, configure um segredo de bypass para automação e guarde-o no GitHub. O código envia esse header somente ao deploy correspondente. Mantenha a proteção habilitada; respostas 401/403 devem ser resolvidas com a configuração de automação. Configure também o escopo de produção se o deploy staged for protegido.
 
@@ -124,7 +124,7 @@ Os valores compartilhados abaixo podem ser **Repository variables/secrets**, ace
 | `PREVIEW_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de preview |
 | `PRODUCTION_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de produção |
 | `PREVIEW_SUPABASE_ANON_KEY` | Secret | JWT público `anon` do preview; igual ao valor Vercel Preview |
-| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | JWT público `anon` da produção para build, função e consulta de ausência; igual ao valor Vercel Production |
+| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Chave pública de produção para build e consulta de ausência; igual ao valor Vercel Production. O nome do secret não impõe formato JWT. |
 | `VERCEL_TOKEN` | Secret | Token temporário autorizado da equipe / All Projects; acesso ao projeto e à leitura da equipe exigida pelo `pull` |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Secret, se necessário | Acesso da automação aos deploys protegidos |
 
