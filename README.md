@@ -53,7 +53,7 @@ A porta padrão de desenvolvimento é **5173**: `http://localhost:5173`. O `vite
 
 ### 1. Escolher o ambiente
 
-O desafio exige Supabase separados para **preview** e **produção**. O banco de produção já existe; o projeto de preview ainda precisa ser provisionado. Use um ambiente de desenvolvimento/preview para os experimentos com banco real. Os testes E2E locais usam rede simulada.
+O desafio usa projetos Supabase separados para **preview** e **produção**, preparados e conferidos na entrega descrita abaixo. Use o ambiente de desenvolvimento/preview para experimentos com banco real. Os testes E2E locais usam rede simulada.
 
 ### 2. Variáveis de Ambiente
 
@@ -73,11 +73,11 @@ A CLI Supabase já está nas dependências. O schema de produção corresponde a
 
 Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para configurar os dois ambientes e publicar pelo fluxo de CI/CD.
 
-## Estado do desafio
+## Entrega auditada em 18/09/2026
 
-O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) está em draft. A integração local de 18/09/2026 passou com 19 E2E, 51 unitários, seis guards, tipos e build. O lint completo passou com zero erros e sete avisos de Fast Refresh; agora também integra o workflow. A última execução remota conferida antes desta atualização foi `af742bc`: [PR aprovado](https://github.com/Dyllanbr/Velo/actions/runs/35322968592) e [push com qualidade aprovada e preview bloqueado na configuração](https://github.com/Dyllanbr/Velo/actions/runs/35322964915). Isso ainda não comprova isolamento remoto nem publicação em produção.
+O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) foi integrado à `main` no SHA `98eb6bb6fa4d65f1d22e33229e72c4792561d9b5`. A [execução 35367456549, tentativa 1](https://github.com/Dyllanbr/Velo/actions/runs/35367456549) aprovou os três jobs: qualidade, preview com isolamento e produção com promote. Passaram **94 unitários, 23 testes Node, 19 E2E locais e um E2E remoto**, além de tipos e build; lint teve zero erros e sete avisos de Fast Refresh.
 
-O projeto Vercel recebeu as variáveis de produção. O token de CI, restrito ao projeto `velo` e válido até 25/09/2026, foi salvo como `VERCEL_TOKEN` no GitHub. Restam o Supabase de preview e sua configuração remota; nenhum projeto externo foi pausado para liberar cota. Os detalhes e evidências estão em [docs/desafio-preview.md](docs/desafio-preview.md).
+O E2E criou um pedido no Supabase de preview, confirmou sua leitura e sua ausência em produção; uma consulta privilegiada complementar confirmou essa ausência pelos mesmos identificadores. A pipeline reconstruiu o mesmo SHA com as variáveis de produção, verificou o deployment e o promoveu. Esta fotografia cobre essas evidências e não inclui uma operação de escrita/consulta da aplicação no domínio final de produção. Consulte o [PR #2 para o resultado final do aceite e seus recibos](https://github.com/Dyllanbr/Velo/pull/2) e [o procedimento do desafio](docs/desafio-preview.md).
 
 ---
 
@@ -171,7 +171,7 @@ Landing → Configurador → Checkout
 ```bash
 yarn dev                         # Desenvolvimento (porta padrão 5173)
 yarn typecheck                   # Conferir os projetos TypeScript
-node --test scripts/ci-guards.test.mjs # Testar os guards da pipeline
+node --test scripts/ci-guards.test.mjs scripts/verify-deployment.test.mjs # Guards e verificador
 yarn test:unit                   # Testes unitários com Vitest
 yarn playwright install chromium # Instalar navegador no cache configurado no D
 yarn test:e2e                    # E2E locais com rede simulada (porta 4173)
