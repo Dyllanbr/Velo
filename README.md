@@ -75,9 +75,11 @@ Consulte [o procedimento e o estado do desafio](docs/desafio-preview.md) para co
 
 ## Entrega auditada em 18/09/2026
 
-O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) foi integrado à `main` no SHA `98eb6bb6fa4d65f1d22e33229e72c4792561d9b5`. A [execução 35367456549, tentativa 1](https://github.com/Dyllanbr/Velo/actions/runs/35367456549) aprovou os três jobs: qualidade, preview com isolamento e produção com promote. Passaram **94 unitários, 23 testes Node, 19 E2E locais e um E2E remoto**, além de tipos e build; lint teve zero erros e sete avisos de Fast Refresh.
+A aplicação está publicada em [velo-one-alpha.vercel.app](https://velo-one-alpha.vercel.app/). O [PR #2](https://github.com/Dyllanbr/Velo/pull/2) reúne o aceite do desafio e os recibos; [o procedimento](docs/desafio-preview.md) explica a separação de ambientes e os limites das verificações.
 
-O E2E criou um pedido no Supabase de preview, confirmou sua leitura e sua ausência em produção; uma consulta privilegiada complementar confirmou essa ausência pelos mesmos identificadores. A pipeline reconstruiu o mesmo SHA com as variáveis de produção, verificou o deployment e o promoveu. Esta fotografia cobre essas evidências e não inclui uma operação de escrita/consulta da aplicação no domínio final de produção. Consulte o [PR #2 para o resultado final do aceite e seus recibos](https://github.com/Dyllanbr/Velo/pull/2) e [o procedimento do desafio](docs/desafio-preview.md).
+O aceite no domínio público foi realizado no SHA `0e46bdd5181039960244284c5d5a5ee1101a6afe`, após a [execução 35369214476](https://github.com/Dyllanbr/Velo/actions/runs/35369214476). Um pedido sintético à vista foi criado pela aplicação com POST 201 e consultado com GET 200. Consultas SQL dirigidas confirmaram o registro em produção e sua ausência no preview. Esse aceite não chamou a análise de crédito nem usou o pedido do E2E de preview.
+
+Após as práticas do [PR #3](https://github.com/Dyllanbr/Velo/pull/3), a [execução 35372576984](https://github.com/Dyllanbr/Velo/actions/runs/35372576984) validou e publicou a main `3aeccdebce59de2957593bc1bd403fd6dd855279`: **94 unitários, 23 testes Node, 19 E2E locais e um E2E real no preview**, além de tipos/build; lint com zero erros e sete avisos de Fast Refresh. A ausência do novo pedido de preview em produção foi confirmada também por leitura privilegiada. A leitura posterior do domínio público conferiu o novo marcador e os mesmos hashes de HTML/script do aceite anterior, sem repetir a escrita em produção. Esses resultados são retratos dos SHAs indicados, não uma aprovação automática de commits posteriores.
 
 ---
 
