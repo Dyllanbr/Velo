@@ -160,7 +160,7 @@ $env:PLAYWRIGHT_BROWSERS_PATH = 'D:\Projetos\.cache\playwright'
 npx.cmd --yes yarn@1.22.22 install --frozen-lockfile
 npx.cmd --yes yarn@1.22.22 lint
 npx.cmd --yes yarn@1.22.22 typecheck
-node --test scripts/ci-guards.test.mjs
+node --test scripts/ci-guards.test.mjs scripts/verify-deployment.test.mjs
 npx.cmd --yes yarn@1.22.22 test:unit
 npx.cmd --yes yarn@1.22.22 playwright install chromium
 npx.cmd --yes yarn@1.22.22 test:e2e
@@ -178,6 +178,7 @@ Os runners GitHub são Linux hospedado e usam armazenamento descartável deles, 
 ## Limites e diagnóstico
 
 - Guard sem variáveis: configuração incompleta; não preencher com placeholders para forçar deploy.
+- Falha HTTP: o verificador informa método, caminho, status e, quando presentes e válidos, `x-vercel-error`/`x-vercel-id`. Não imprime query strings, corpos ou bypass. 401, 403, 404 e redirects interrompem a verificação; nenhum redirect é seguido. Um 404 não é tratado automaticamente como atraso de propagação: confira o recurso indicado e o output/roteamento conforme o [guia oficial de diagnóstico](https://vercel.com/kb/guide/how-to-debug-404-errors).
 - Vercel Preview/Production diferente do GitHub: corrigir o escopo de origem e repetir o pull/build.
 - Build com URL do outro ambiente: descartar o artefato e reconstruir no escopo correto.
 - Ref ou chave errada: bloquear antes de qualquer escrita; JWT `anon` é conferido por papel/ref, enquanto publishable keys opacas dependem da validação pela API real.
