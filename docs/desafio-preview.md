@@ -2,24 +2,24 @@
 
 ## Estado desta entrega
 
-Retrato da execução em **18/09/2026**, referente à implementação até [`99b3f95`](https://github.com/Dyllanbr/Velo/commit/99b3f95) e ao [PR #2, ainda em draft](https://github.com/Dyllanbr/Velo/pull/2). A implementação e a qualidade local estão disponíveis, e parte da configuração remota já foi realizada. **O desafio ainda não tem evidência de isolamento remoto nem de publicação em produção.**
+Retrato da execução em **18/09/2026**, com o [PR #2 ainda em draft](https://github.com/Dyllanbr/Velo/pull/2). A integração local atual passou com 19 E2E, 51 unitários, seis guards, tipos, build e lint completo (zero erros, sete avisos). O último CI remoto conferido antes desta atualização corresponde a [`af742bc`](https://github.com/Dyllanbr/Velo/commit/af742bc). **O desafio ainda não tem evidência de isolamento remoto nem de publicação em produção.**
 
 | Item | Estado confirmado |
 | --- | --- |
-| Qualidade no GitHub | `Unit and browser checks` passou na [execução 35308673588](https://github.com/Dyllanbr/Velo/actions/runs/35308673588), para `99b3f95`. A suíte contém 51 testes unitários, 6 guards e 8 E2E locais; typecheck e build também passaram. |
-| Execução do PR | O [run 35308677006](https://github.com/Dyllanbr/Velo/actions/runs/35308677006) terminou com sucesso. Preview e produção foram pulados por se tratar de pull request. |
-| Preview no push 35308673588 | Falhou em `Validate configuration before contacting Vercel`, com configuração incompleta. Pull, build, deploy, verificação remota e E2E real foram pulados; produção também foi pulada. O status do step não identifica sozinho qual variável faltava. |
+| Qualidade no GitHub | `Unit and browser checks` passou na [execução 35322964915](https://github.com/Dyllanbr/Velo/actions/runs/35322964915), para `af742bc`: 51 unitários, seis guards, 12 E2E locais, tipos e build. Os sete cenários acrescentados depois foram conferidos na integração local acima. |
+| Execução do PR | O [run 35322968592](https://github.com/Dyllanbr/Velo/actions/runs/35322968592) terminou com sucesso. Preview e produção foram pulados por se tratar de pull request. |
+| Preview no push 35322964915 | Falhou em `Validate configuration before contacting Vercel`, com configuração incompleta. Pull, build, deploy, verificação remota e E2E real foram pulados; produção também foi pulada. O status do step não identifica sozinho qual variável faltava. |
 | Vercel | Projeto `velo` criado, plano Hobby ativo; framework Vite, Node 24.x, instalação `yarn install --frozen-lockfile`, build `yarn build` e saída `dist`. As três variáveis `VITE_SUPABASE_*` de Production foram configuradas. |
 | GitHub | Environments `preview` e `production` criados. Quatro Repository variables configuradas: `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `PRODUCTION_SUPABASE_PROJECT_REF` e `PRODUCTION_SUPABASE_URL`. Secret `PRODUCTION_SUPABASE_ANON_KEY` configurado, confirmado às 03:04:04 UTC; valor não reproduzido. |
-| Token de CI | A tentativa de `vercel tokens add` com escopo de projeto retornou **403 — `Cannot create tokens for this app`**. O formulário da conta permite restringir um token ao projeto `velo` e definir validade; a criação está pendente. A autenticação local da CLI não supre `VERCEL_TOKEN` no GitHub. |
-| Supabase de preview | Ainda não existe um segundo projeto dedicado ao Velô. O painel confirmou plano Free e limite de dois projetos gratuitos ativos já atingido; a criação está desabilitada. O outro projeto ativo não pertence ao escopo deste trabalho. Branching não está disponível. Nenhum projeto foi pausado nem plano alterado. |
+| Token de CI | Após autorização específica, `Velo-GitHub-Actions-7dias` foi criado pelo painel, restrito ao projeto `velo`, com expiração em 25/09/2026. O GitHub confirmou o armazenamento como Repository secret `VERCEL_TOKEN`. Seu uso no deploy ainda depende da configuração de preview. |
+| Supabase de preview | Ainda não existe um segundo projeto dedicado ao Velô. O painel confirmou plano Free e limite de dois projetos gratuitos ativos já atingido; a criação está desabilitada. O usuário pediu para aguardar antes de pausar o outro projeto. Branching não está disponível. Nenhum projeto foi pausado nem plano alterado. |
 | Banco de produção | O schema observado corresponde ao resultado final das quatro migrações locais, mas a listagem do histórico remoto está vazia. Não houve `db push`, `migration repair`, reset ou alteração do schema nessa conferência. |
 
 Os IDs públicos da Vercel usados na configuração são `team_pTNVD9mWcQAWzppxe16GoBd9` (Team/Org) e `prj_UHZEp71N2PnNIQMqm34i1VqMq4XD` (Project). Eles identificam os destinos; não são tokens de acesso. Valores de chaves e credenciais não são reproduzidos nesta documentação.
 
 O relatório Playwright de testes locais do run 35308673588 foi preservado no acervo privado em `D:\Projetos\Automatiza-Ai\Evidencias\GitHub\run-35308673588\playwright-report`, antes da expiração do artefato. Esse relatório usa rede simulada e não comprova isolamento remoto. Os registros anteriores também foram mantidos.
 
-Para concluir: viabilizar o projeto Supabase de preview, aplicar nele schema/RLS/funções, obter um token de CI aceito pelo projeto, completar variáveis e secrets dos dois ambientes e executar novamente o fluxo. A configuração parcial da Vercel/GitHub não substitui um deploy bem-sucedido. Não registre os testes com rede simulada como evidência de isolamento remoto.
+Para concluir: viabilizar o projeto Supabase de preview, aplicar nele schema/RLS/funções, completar variáveis e secrets dos dois ambientes e executar novamente o fluxo com o token configurado. A configuração parcial da Vercel/GitHub não substitui um deploy bem-sucedido. Não registre os testes com rede simulada como evidência de isolamento remoto.
 
 O projeto Supabase `zbfdffxonoztoydpdlru` é tratado como produção. O guard o bloqueia como destino de preview. Um projeto de preview diferente é obrigatório. Mudar a produção exige revisar essa constante em `scripts/ci-guards.mjs` e o guard dos testes, com a justificativa no PR.
 
@@ -31,7 +31,7 @@ A escolha deste projeto é testar um commit em preview e reconstruir **o mesmo S
 
 O fluxo em `.github/workflows/quality-and-deploy.yml` é:
 
-1. Instalar a versão travada das dependências; conferir os tipos TypeScript e executar testes unitários, guards, build e testes de navegador locais com rede simulada.
+1. Instalar a versão travada das dependências; executar lint, conferir os tipos TypeScript e executar testes unitários, guards, build e testes de navegador locais com rede simulada.
 2. Em push na `main` ou em `feat/preview-isolado`, baixar configurações de preview e conferir projeto Vercel, URLs, refs e tipo de chave pública.
 3. Construir preview, inspecionar os arquivos gerados e publicar o artefato verificado.
 4. Conferir `/build-info.json`, JavaScript servido e rotas da SPA; executar os E2E reais contra a URL desse deploy.
@@ -101,11 +101,13 @@ As três variáveis abaixo já foram configuradas no escopo **Production**. O es
 
 As três variáveis devem ter valores iguais aos respectivos valores do GitHub abaixo. O guard verifica os valores baixados da Vercel sem imprimir as chaves. Não crie outras variáveis `VITE_*` sem revisar o allowlist, pois elas são expostas ao navegador. Nunca use `service_role`, `sb_secret_*`, senha do banco ou access token como variável `VITE_*`.
 
+O formato aceito pelo guard não garante autenticação na Edge Function. O retrato de produção registra `credit-analysis` com `verify_jwt: true`; o preflight envia `Authorization: Bearer` apenas para JWT e somente `apikey` para publishable. Para conservar esse modelo, use um JWT público `anon` do respectivo projeto, quando disponível, e confirme a resposta HTTP 400 ao corpo vazio. O uso de publishable exige antes revisar a autenticação equivalente dos dois projetos; não desative a verificação apenas para obter um teste verde.
+
 Se Deployment Protection estiver habilitado, configure um segredo de bypass para automação e guarde-o no GitHub. O código envia esse header somente ao deploy correspondente. Mantenha a proteção habilitada; respostas 401/403 devem ser resolvidas com a configuração de automação. Configure também o escopo de produção se o deploy staged for protegido.
 
 ## Configurar GitHub
 
-Os environments `preview` e `production` já foram criados. Estão confirmadas as quatro Repository variables listadas no estado da entrega e o secret `PRODUCTION_SUPABASE_ANON_KEY` (03:04:04 UTC). Os refs/URLs e a chave pública de preview dependem do novo Supabase; o token de CI continua pendente após a resposta 403 da Vercel. O bypass de proteção deve ser conferido conforme a configuração dos deploys.
+Os environments `preview` e `production` já foram criados. Estão confirmadas as quatro Repository variables listadas no estado da entrega e os secrets `PRODUCTION_SUPABASE_ANON_KEY` e `VERCEL_TOKEN`. Os refs/URLs e a chave pública de preview dependem do novo Supabase. O bypass de proteção deve ser conferido conforme a configuração dos deploys.
 
 Os valores compartilhados abaixo podem ser **Repository variables/secrets**, acessíveis a ambos; se preferir variáveis por environment, preencha os nomes em todos os environments que os utilizam. A proteção da `main` e a exigência do check de qualidade devem ser conferidas; não são dadas como configuradas por este documento. Proteções extras de aprovação do environment de produção são opcionais, conforme o plano da conta e a política do projeto.
 
@@ -126,7 +128,7 @@ Nenhuma service key é necessária. O nome “Secret” no GitHub é a forma de 
 
 ## Executar e comprovar
 
-Depois de resolver as pendências de configuração, execute novamente o workflow na branch `feat/preview-isolado` por dispatch ou por um novo push autorizado. O run 35299625566 documenta qualidade verde e o bloqueio preventivo, não um preview aprovado. Abra a nova execução em Actions: todos os checks precisam passar. Guarde o relatório Playwright, a evidência JSON com o identificador único do pedido e a URL imutável do deploy. Os artefatos ficam disponíveis por sete dias; baixe a evidência necessária para a apresentação.
+Depois de resolver as pendências de configuração, reexecute o run de push do SHA desejado na branch `feat/preview-isolado`, conferindo o commit em Actions. O run 35322964915 documenta qualidade verde e bloqueio preventivo de `af742bc`, não um preview aprovado. Se houver alterações posteriores, escolha o run do novo push autorizado. Não dependa de dispatch enquanto o workflow não estiver disponível na branch padrão. Abra a execução: todos os checks precisam passar. Guarde o relatório Playwright, a evidência JSON com o identificador único do pedido e a URL imutável do deploy. Os artefatos ficam disponíveis por sete dias; baixe a evidência necessária para a apresentação.
 
 O pedido de teste permanece identificado em preview como evidência. Não há limpeza destrutiva automática. Os testes não criam pedidos em produção. Se for necessário limpar preview depois da gravação, remova apenas os identificadores explicitamente registrados pela execução.
 

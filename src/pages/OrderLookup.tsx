@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Package, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Search, Package, CheckCircle, XCircle, Clock, Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,11 +36,26 @@ const colorLabels: Record<ExteriorColor, string> = {
   'midnight-black': 'Midnight Black',
 };
 
+function getStatusPresentation(status: string) {
+  switch (status) {
+    case 'APROVADO':
+      return { Icon: CheckCircle, className: 'bg-green-100 text-green-700', message: null };
+    case 'REPROVADO':
+      return { Icon: XCircle, className: 'bg-red-100 text-red-700', message: null };
+    case 'EM_ANALISE':
+      return { Icon: Clock, className: 'bg-secondary text-foreground', message: 'Aguardando análise de crédito.' };
+    default:
+      return { Icon: Info, className: 'bg-secondary text-foreground', message: 'Consulte o atendimento para confirmar este status.' };
+  }
+}
+
 const OrderLookup = () => {
   const [orderId, setOrderId] = useState('');
   const [searchedOrder, setSearchedOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const presentation = searchedOrder ? getStatusPresentation(searchedOrder.status) : null;
+  const StatusIcon = presentation?.Icon;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,21 +159,12 @@ const OrderLookup = () => {
                     </p>
                   </div>
                 </div>
-                <div
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
-                    searchedOrder.status === 'APROVADO'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {searchedOrder.status === 'APROVADO' ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <XCircle className="w-4 h-4" />
-                  )}
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${presentation?.className}`}>
+                  {StatusIcon && <StatusIcon className="w-4 h-4" aria-hidden="true" />}
                   {searchedOrder.status}
                 </div>
               </div>
+              {presentation?.message && <p className="text-sm text-muted-foreground">{presentation.message}</p>}
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Car Image */}
