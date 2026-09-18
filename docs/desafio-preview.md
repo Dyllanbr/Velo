@@ -2,24 +2,25 @@
 
 ## Estado desta entrega
 
-Retrato da execução em **18/09/2026**, com o [PR #2 ainda em draft](https://github.com/Dyllanbr/Velo/pull/2). A integração local atual passou com 19 E2E, 51 unitários, seis guards, tipos, build e lint completo (zero erros, sete avisos). O último CI remoto conferido antes desta atualização corresponde a [`af742bc`](https://github.com/Dyllanbr/Velo/commit/af742bc). **O desafio ainda não tem evidência de isolamento remoto nem de publicação em produção.**
+Retrato conferido em **18/09/2026 às 14:53 UTC**, com o [PR #2 ainda em draft](https://github.com/Dyllanbr/Velo/pull/2). A integração local passou com 19 E2E, 51 unitários, seis guards, tipos, build e lint completo (zero erros, sete avisos). A **tentativa 3 do run `35346344943` passou**, para [`ef2c37a9b082acba29cdf0661207bb370729e230`](https://github.com/Dyllanbr/Velo/commit/ef2c37a9b082acba29cdf0661207bb370729e230): preview publicado, verificação HTTP e E2E real aprovados. **O aceite ainda precisa da auditoria complementar de ausência em produção, das evidências preservadas e da publicação verificada de produção.**
 
 | Item | Estado confirmado |
 | --- | --- |
-| Qualidade no GitHub | `Unit and browser checks` passou na [execução 35322964915](https://github.com/Dyllanbr/Velo/actions/runs/35322964915), para `af742bc`: 51 unitários, seis guards, 12 E2E locais, tipos e build. Os sete cenários acrescentados depois foram conferidos na integração local acima. |
-| Execução do PR | O [run 35322968592](https://github.com/Dyllanbr/Velo/actions/runs/35322968592) terminou com sucesso. Preview e produção foram pulados por se tratar de pull request. |
-| Preview no push 35322964915 | Falhou em `Validate configuration before contacting Vercel`, com configuração incompleta. Pull, build, deploy, verificação remota e E2E real foram pulados; produção também foi pulada. O status do step não identifica sozinho qual variável faltava. |
-| Vercel | Projeto `velo` criado, plano Hobby ativo; framework Vite, Node 24.x, instalação `yarn install --frozen-lockfile`, build `yarn build` e saída `dist`. As três variáveis `VITE_SUPABASE_*` de Production foram configuradas. |
-| GitHub | Environments `preview` e `production` criados. Quatro Repository variables configuradas: `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `PRODUCTION_SUPABASE_PROJECT_REF` e `PRODUCTION_SUPABASE_URL`. Secret `PRODUCTION_SUPABASE_ANON_KEY` configurado, confirmado às 03:04:04 UTC; valor não reproduzido. |
-| Token de CI | Após autorização específica, `Velo-GitHub-Actions-7dias` foi criado pelo painel, restrito ao projeto `velo`, com expiração em 25/09/2026. O GitHub confirmou o armazenamento como Repository secret `VERCEL_TOKEN`. Seu uso no deploy ainda depende da configuração de preview. |
-| Supabase de preview | Ainda não existe um segundo projeto dedicado ao Velô. O painel confirmou plano Free e limite de dois projetos gratuitos ativos já atingido; a criação está desabilitada. O usuário pediu para aguardar antes de pausar o outro projeto. Branching não está disponível. Nenhum projeto foi pausado nem plano alterado. |
-| Banco de produção | O schema observado corresponde ao resultado final das quatro migrações locais, mas a listagem do histórico remoto está vazia. Não houve `db push`, `migration repair`, reset ou alteração do schema nessa conferência. |
+| Qualidade no GitHub | `Unit and browser checks` passou na [execução 35346344943](https://github.com/Dyllanbr/Velo/actions/runs/35346344943), para `ef2c37a`, incluindo lint, tipos, guards, unitários, build e E2E locais. O rerun dos jobs falhos preserva esse resultado; não o confundir com nova execução de qualidade. |
+| Execução de PR | O workflow executa somente qualidade em pull requests; preview e produção são pulados por condição. Um PR verde não demonstra deploy ou isolamento remoto. |
+| Preview na tentativa 3 | Pull, prepare, build, inspeção do bundle, deploy, verificação HTTP, E2E real e upload de evidências passaram. O job terminou às 14:52:51 UTC. Produção foi pulada por se tratar da branch `feat/preview-isolado`. |
+| Vercel | Projeto `velo`, plano Hobby, Vite, Node 24.x, instalação `yarn install --frozen-lockfile`, build `yarn build`, saída `dist`. As três `VITE_SUPABASE_*` de Preview estão configuradas com `bcsepghyrzmabmmdinuy`; as três de Production foram preservadas. |
+| GitHub | Environments `preview`/`production`, seis Repository variables e quatro secrets confirmados: `PREVIEW_SUPABASE_ANON_KEY`, `PRODUCTION_SUPABASE_ANON_KEY`, `VERCEL_TOKEN`, `VERCEL_AUTOMATION_BYPASS_SECRET`. Valores de credenciais não são reproduzidos. |
+| Acesso da automação | Após autorização específica, o token temporário de equipe substituiu `VERCEL_TOKEN`; expiração exibida: 25/09/2026. Bypass do projeto criado e armazenado; Require Log In permanece ativo. A tentativa 3 confirmou acesso ao pull/deploy e à verificação HTTP de preview. |
+| Supabase de preview | `velo-preview`, ref `bcsepghyrzmabmmdinuy`, ativo e distinto da produção. Quatro migrations aplicadas e `credit-analysis` implantada. A solução da cota foi autorizada e executada; não criar outro preview para repetir esta etapa. |
+| Comparação dos bancos | Catálogos comparados com resultado `schema_match`: colunas, PK/constraints, índices, RLS/policies, triggers e função SQL de timestamp coincidem. Produção tem histórico vazio; preview registra quatro versões. Essa diferença está documentada, sem `db push` ou `migration repair` em produção. |
+| Função de crédito | Fonte de produção comparada com a local, idêntica após normalizar CRLF/LF. Preflight real no preview retornou HTTP 400 e exatamente `{"error":"CPF é obrigatório"}`, com `verify_jwt: true`. Não comprova integração externa de crédito nem substitui o E2E remoto. |
 
 Os IDs públicos da Vercel usados na configuração são `team_pTNVD9mWcQAWzppxe16GoBd9` (Team/Org) e `prj_UHZEp71N2PnNIQMqm34i1VqMq4XD` (Project). Eles identificam os destinos; não são tokens de acesso. Valores de chaves e credenciais não são reproduzidos nesta documentação.
 
 O relatório Playwright de testes locais do run 35308673588 foi preservado no acervo privado em `D:\Projetos\Automatiza-Ai\Evidencias\GitHub\run-35308673588\playwright-report`, antes da expiração do artefato. Esse relatório usa rede simulada e não comprova isolamento remoto. Os registros anteriores também foram mantidos.
 
-Para concluir: viabilizar o projeto Supabase de preview, aplicar nele schema/RLS/funções, completar variáveis e secrets dos dois ambientes e executar novamente o fluxo com o token configurado. A configuração parcial da Vercel/GitHub não substitui um deploy bem-sucedido. Não registre os testes com rede simulada como evidência de isolamento remoto.
+Para concluir: preservar os artefatos do preview aprovado, conferir o identificador sintético por leitura privilegiada em produção e concluir a publicação verificada na main. O E2E real passou, mas sua consulta com chave pública não substitui a auditoria complementar descrita abaixo. Os recibos sanitizados de configuração, catálogos e tentativas estão preservados no acervo privado em `D:\Projetos\Automatiza-Ai\Evidencias`; cada resultado permanece associado ao seu SHA e horário.
 
 O projeto Supabase `zbfdffxonoztoydpdlru` é tratado como produção. O guard o bloqueia como destino de preview. Um projeto de preview diferente é obrigatório. Mudar a produção exige revisar essa constante em `scripts/ci-guards.mjs` e o guard dos testes, com a justificativa no PR.
 
@@ -43,16 +44,17 @@ Pull requests executam somente a qualidade local, sem credenciais. Um dispatch e
 
 ## Preparar os dois Supabase
 
-Crie um novo projeto vazio para preview. A região pode ser a mesma de produção. Não copie pedidos reais para esse ambiente. Aplique os arquivos existentes em `supabase/migrations` e publique todas as funções existentes em `supabase/functions`, conservando a configuração em `supabase/config.toml` e as políticas RLS.
+O preview atual **já foi preparado**: `bcsepghyrzmabmmdinuy`. O roteiro abaixo documenta a preparação; não é necessário criar outro projeto nem reaplicá-lo como requisito para um rerun do frontend. Para um novo ambiente deliberadamente escolhido, confira seu ref, use um projeto vazio e aplique os arquivos de `supabase/migrations` e as funções de `supabase/functions`, conservando a configuração e as políticas RLS. Não copie pedidos reais para preview.
 
 Use a CLI já presente nas dependências. Antes de cada vínculo, confira o ref no dashboard. A senha do banco e o access token devem ser informados em variáveis de sessão, nunca escritos em comandos versionados ou em arquivos rastreados.
 
 ```powershell
-# Execute somente depois de criar o projeto e conferir o seu ref.
+# Roteiro de preparação; já concluído no preview atual.
+# Execute somente se houver necessidade de preparar o destino conferido.
 . 'D:\Projetos\Automatiza-Ai\Iniciar-Ambiente.ps1'
 $projectDir = 'D:\Projetos\Velo'
 $supabaseCli = Join-Path $projectDir 'node_modules\.bin\supabase.cmd'
-$previewRef = '<ref-do-projeto-preview>'
+$previewRef = 'bcsepghyrzmabmmdinuy'
 if ($previewRef -notmatch '^[a-z]{20}$') { throw 'Informe um ref válido de preview' }
 if ($previewRef -eq 'zbfdffxonoztoydpdlru') { throw 'Destino de produção bloqueado' }
 
@@ -75,13 +77,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Migração falhou; deploy de funções interro
 if ($LASTEXITCODE -ne 0) { throw 'Deploy de funções falhou; preparação incompleta' }
 ```
 
-Esse roteiro Windows usa a CLI já instalada no projeto e verifica o vínculo salvo antes de cada `db push`. Em PowerShell, uma falha de um programa externo não interrompe necessariamente as linhas seguintes; por isso os códigos de saída são conferidos explicitamente. Os comandos acima ainda não foram executados contra um novo preview. Não execute outro `supabase link` concorrente nesse diretório durante a aplicação.
+Esse roteiro Windows usa a CLI já instalada no projeto e verifica o vínculo salvo antes de cada `db push`. Em PowerShell, uma falha de um programa externo não interrompe necessariamente as linhas seguintes; por isso os códigos de saída são conferidos explicitamente. Link, dry-run, quatro migrations e deploy da função já terminaram com sucesso no preview atual. Não execute outro `supabase link` concorrente nesse diretório durante uma aplicação.
 
 Em produção, a conferência somente de metadados encontrou os efeitos das quatro migrações: criação de `orders`/RLS/trigger (`20251221161820`), adição de `optionals` (`20251221163213`), remoção de `interior_color` (`20251221205335`) e renomeação de `exterior_color` para `color` (`20251221205414`). O histórico remoto foi listado sem versões. Isso não informa quem aplicou o schema nem por qual mecanismo; reaplicar cegamente tentaria criar objetos existentes.
 
-Essa divergência entre schema e histórico continua pendente de reconciliação. Não foi executado `db push` ou `migration repair` em produção. Não execute reset nem limpeza de tabelas. O workflow publica o frontend e **não executa migrações de banco automaticamente**; a preparação de um preview vazio e a reconciliação do histórico de produção são etapas distintas.
+Essa divergência entre schema e histórico está documentada: a comparação dos catálogos coincide, mas os históricos não são iguais. Não foi executado `db push` ou `migration repair` em produção; uma eventual reconciliação do histórico exige avaliação própria, não reaplicação automática. Não execute reset nem limpeza de tabelas. O workflow publica o frontend e **não executa migrações de banco automaticamente**.
 
-Confirme nas duas plataformas que as funções usadas pelo checkout estão disponíveis. O E2E de preview agora envia `{}` para `credit-analysis` e exige HTTP 400 com `CPF é obrigatório`, antes de criar o pedido. Esse corpo alcança a validação inicial do handler local antes da chamada externa, comportamento coberto por teste. Um 401, 404 ou contrato diferente interrompe o E2E. O resultado é anexado ao relatório sem credenciais. Essa checagem mínima não substitui a comparação do código e da configuração das funções entre os dois projetos.
+Confirme nas duas plataformas que as funções usadas pelo checkout estão disponíveis. O E2E de preview envia `{}` para `credit-analysis` e exige HTTP 400 com exatamente `{"error":"CPF é obrigatório"}`, antes de criar o pedido. Esse corpo alcança a validação inicial do handler local antes da chamada externa, comportamento coberto por teste. Um 401, 403, 404 ou contrato diferente interrompe o E2E. O preflight separado e a suíte real já passaram no preview atual; a suíte repete a checagem em cada execução e anexa seu resultado sem credenciais. Essa checagem mínima não substitui a comparação do código e da configuração das funções entre os dois projetos.
 
 Políticas RLS determinam o que a chave pública pode ver: HTTP 200 com `[]` também pode significar linhas ocultas. A auditoria inicial encontrou SELECT `USING (true)`, mas a prova final deve incluir uma nova comparação de policies e a conferência do identificador sintético por leitura privilegiada, junto ao run remoto. Essa coleta será feita fora do CI com acesso existente, sem acrescentar uma credencial administrativa ao GitHub. Uma falha de permissão ou uma consulta pública vazia sem essa evidência não comprova ausência.
 
@@ -91,23 +93,23 @@ O workflow não consome essa auditoria externa como condição automática de pr
 
 O projeto `velo` já existe no time e IDs registrados acima, com framework Vite, Node 24.x e plano Hobby ativo. As configurações remotas conferidas são instalação `yarn install --frozen-lockfile`, build `yarn build` e saída `dist`, compatíveis com `vercel.json`. O código exige que o resultado de `vercel pull` corresponda aos IDs esperados; nome/slug não substituem esses IDs.
 
-As três variáveis abaixo já foram configuradas no escopo **Production**. O escopo **Preview** permanece dependente do novo Supabase. Complete e confira os dois escopos separadamente:
+As três variáveis abaixo já foram configuradas em **Preview** e **Production**. A chave de Preview foi conferida como JWT público `anon`; os valores de Production foram preservados. A tabela descreve a configuração requerida pelo modelo de autenticação atual: antes do aceite de produção, confira também o tipo/role/ref de sua chave sem imprimir o valor. Preview passou na inspeção do bundle; o build de produção ainda precisa demonstrar que incorporou os valores de seu próprio escopo:
 
 | Variável Vercel | Preview | Production |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | URL HTTPS do novo Supabase | `https://zbfdffxonoztoydpdlru.supabase.co` |
-| `VITE_SUPABASE_PROJECT_ID` | Ref do novo Supabase | `zbfdffxonoztoydpdlru` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key ou JWT `anon` de preview | Publishable key ou JWT `anon` de produção |
+| `VITE_SUPABASE_URL` | `https://bcsepghyrzmabmmdinuy.supabase.co` | `https://zbfdffxonoztoydpdlru.supabase.co` |
+| `VITE_SUPABASE_PROJECT_ID` | `bcsepghyrzmabmmdinuy` | `zbfdffxonoztoydpdlru` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | JWT público `anon` do preview | JWT público `anon` da produção, compatível com `verify_jwt: true` |
 
 As três variáveis devem ter valores iguais aos respectivos valores do GitHub abaixo. O guard verifica os valores baixados da Vercel sem imprimir as chaves. Não crie outras variáveis `VITE_*` sem revisar o allowlist, pois elas são expostas ao navegador. Nunca use `service_role`, `sb_secret_*`, senha do banco ou access token como variável `VITE_*`.
 
-O formato aceito pelo guard não garante autenticação na Edge Function. O retrato de produção registra `credit-analysis` com `verify_jwt: true`; o preflight envia `Authorization: Bearer` apenas para JWT e somente `apikey` para publishable. Para conservar esse modelo, use um JWT público `anon` do respectivo projeto, quando disponível, e confirme a resposta HTTP 400 ao corpo vazio. O uso de publishable exige antes revisar a autenticação equivalente dos dois projetos; não desative a verificação apenas para obter um teste verde.
+**Para o modelo atual da função, configure JWT público `anon` do respectivo projeto.** O nome `VITE_SUPABASE_PUBLISHABLE_KEY` não exige uma chave `sb_publishable_*`. `credit-analysis` usa `verify_jwt: true`; o preflight envia `Authorization: Bearer` somente para JWT e apenas `apikey` para publishable. O guard aceita os dois formatos públicos, mas isso não torna publishable intercambiável com JWT nesse fluxo. Antes de trocar para publishable, revise a autenticação equivalente dos dois projetos e comprove o contrato remoto; não desative a verificação apenas para obter um teste verde.
 
 Se Deployment Protection estiver habilitado, configure um segredo de bypass para automação e guarde-o no GitHub. O código envia esse header somente ao deploy correspondente. Mantenha a proteção habilitada; respostas 401/403 devem ser resolvidas com a configuração de automação. Configure também o escopo de produção se o deploy staged for protegido.
 
 ## Configurar GitHub
 
-Os environments `preview` e `production` já foram criados. Estão confirmadas as quatro Repository variables listadas no estado da entrega e os secrets `PRODUCTION_SUPABASE_ANON_KEY` e `VERCEL_TOKEN`. Os refs/URLs e a chave pública de preview dependem do novo Supabase. O bypass de proteção deve ser conferido conforme a configuração dos deploys.
+Os environments `preview` e `production`, as seis Repository variables e os quatro secrets listados abaixo estão confirmados. O novo token de equipe foi salvo em `VERCEL_TOKEN`, e `VERCEL_AUTOMATION_BYPASS_SECRET` foi adicionado após confirmação de identidade no GitHub. A tentativa 3 validou esses acessos no fluxo de preview; o fluxo de produção permanece separado.
 
 Os valores compartilhados abaixo podem ser **Repository variables/secrets**, acessíveis a ambos; se preferir variáveis por environment, preencha os nomes em todos os environments que os utilizam. A proteção da `main` e a exigência do check de qualidade devem ser conferidas; não são dadas como configuradas por este documento. Proteções extras de aprovação do environment de produção são opcionais, conforme o plano da conta e a política do projeto.
 
@@ -115,20 +117,24 @@ Os valores compartilhados abaixo podem ser **Repository variables/secrets**, ace
 | --- | --- | --- |
 | `VERCEL_ORG_ID` | Variable | Team/Org ID da Vercel |
 | `VERCEL_PROJECT_ID` | Variable | Project ID do Velo |
-| `PREVIEW_SUPABASE_PROJECT_REF` | Variable | Ref do novo projeto |
+| `PREVIEW_SUPABASE_PROJECT_REF` | Variable | `bcsepghyrzmabmmdinuy` |
 | `PRODUCTION_SUPABASE_PROJECT_REF` | Variable | `zbfdffxonoztoydpdlru` |
 | `PREVIEW_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de preview |
 | `PRODUCTION_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de produção |
-| `PREVIEW_SUPABASE_ANON_KEY` | Secret | Chave pública de preview, apesar do nome aceita publishable key |
-| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Configurado; chave pública de produção para build e consulta de ausência |
-| `VERCEL_TOKEN` | Secret | Token com acesso ao projeto no time correto |
+| `PREVIEW_SUPABASE_ANON_KEY` | Secret | JWT público `anon` do preview; igual ao valor Vercel Preview |
+| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | JWT público `anon` da produção para build, função e consulta de ausência; igual ao valor Vercel Production |
+| `VERCEL_TOKEN` | Secret | Token temporário de equipe autorizado, com acesso ao projeto e à leitura da equipe exigida pelo `pull` |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Secret, se necessário | Acesso da automação aos deploys protegidos |
 
 Nenhuma service key é necessária. O nome “Secret” no GitHub é a forma de armazenamento; as chaves `anon`/publishable continuam sendo credenciais públicas do frontend. O GitHub mascara os valores nos logs e o guard não os escreve deliberadamente.
 
+Na CLI **59.15.1** fixada neste workflow, `pull` consulta os dados da equipe mesmo com `VERCEL_ORG_ID` e `VERCEL_PROJECT_ID` definidos. A tentativa 2, com token restrito ao projeto, falhou em `Download preview settings` com `Could not retrieve Project Settings`; o comportamento é compatível com a [issue oficial #17506](https://github.com/vercel/vercel/issues/17506). Acrescentar `--scope` não remove essa consulta. Após autorização e armazenamento do token de equipe, o pull passou na tentativa 3 com os mesmos IDs e workflow. O status HTTP interno da tentativa 2 não foi registrado, portanto não se afirma que ela comprovou o mesmo 403 do relato externo.
+
 ## Executar e comprovar
 
-Depois de resolver as pendências de configuração, reexecute o run de push do SHA desejado na branch `feat/preview-isolado`, conferindo o commit em Actions. O run 35322964915 documenta qualidade verde e bloqueio preventivo de `af742bc`, não um preview aprovado. Se houver alterações posteriores, escolha o run do novo push autorizado. Não dependa de dispatch enquanto o workflow não estiver disponível na branch padrão. Abra a execução: todos os checks precisam passar. Guarde o relatório Playwright, a evidência JSON com o identificador único do pedido e a URL imutável do deploy. Os artefatos ficam disponíveis por sete dias; baixe a evidência necessária para a apresentação.
+Escolha a execução pelo **SHA completo**, não pelo número de run de um retrato anterior. A referência aprovada é `ef2c37a9b082acba29cdf0661207bb370729e230`, [run 35346344943, tentativa 3](https://github.com/Dyllanbr/Velo/actions/runs/35346344943), branch `feat/preview-isolado`. A qualidade veio da primeira execução; o preview foi reexecutado na terceira. Não é necessário repetir esse run já aprovado sem uma nova razão. Se o código ou esta documentação forem commitados e enviados depois, o novo SHA terá outro run: confira o novo push em Actions e use-o para a evidência final. Não crie commit vazio nem promova um SHA diferente do testado.
+
+Não dependa de dispatch enquanto o workflow não estiver disponível na branch padrão. A execução de aceite precisa passar pull, prepare, build, inspeção do bundle, deploy, verificação HTTP e E2E reais; guard verde ou deploy isolado não bastam. Guarde o relatório Playwright e `isolation-evidence.json` com pedido, SHA, refs, URL imutável e horário, além do resultado do preflight. Preserve os artefatos antes dos sete dias de retenção e vincule a consulta privilegiada de ausência em produção ao mesmo pedido sintético.
 
 O pedido de teste permanece identificado em preview como evidência. Não há limpeza destrutiva automática. Os testes não criam pedidos em produção. Se for necessário limpar preview depois da gravação, remova apenas os identificadores explicitamente registrados pela execução.
 
@@ -152,6 +158,7 @@ $env:YARN_CACHE_FOLDER = 'D:\Projetos\.cache\yarn'
 $env:COREPACK_HOME = 'D:\Projetos\.cache\corepack'
 $env:PLAYWRIGHT_BROWSERS_PATH = 'D:\Projetos\.cache\playwright'
 npx.cmd --yes yarn@1.22.22 install --frozen-lockfile
+npx.cmd --yes yarn@1.22.22 lint
 npx.cmd --yes yarn@1.22.22 typecheck
 node --test scripts/ci-guards.test.mjs
 npx.cmd --yes yarn@1.22.22 test:unit
