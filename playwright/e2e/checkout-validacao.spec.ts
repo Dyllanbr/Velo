@@ -17,6 +17,11 @@ const test = base.extend<{ noPosts: void }>({
   }, { auto: true }],
 });
 
+test.beforeEach(async ({ page }) => {
+  await page.goto('/order');
+  await expect(page.getByRole('heading', { name: 'Finalizar Pedido', exact: true })).toBeVisible();
+});
+
 const fieldErrors = {
   name: 'Nome deve ter pelo menos 2 caracteres',
   surname: 'Sobrenome deve ter pelo menos 2 caracteres',
@@ -42,8 +47,6 @@ async function expectOnlyErrors(page: Page, expected: readonly CheckoutField[]) 
 
 async function prepareValidCheckout(page: Page) {
   const fixture = orderFixture();
-  await page.goto('/order');
-  await expect(page.getByRole('heading', { name: 'Finalizar Pedido', exact: true })).toBeVisible();
   await fillCheckout(page, fixture.customer_email);
   for (const [field, value] of Object.entries({
     name: 'Cliente', surname: 'Teste', email: fixture.customer_email,
@@ -57,7 +60,6 @@ async function prepareValidCheckout(page: Page) {
 }
 
 test('checkout incompleto não envia pedido', async ({ page }) => {
-  await page.goto('/order');
   await page.getByTestId('checkout-submit').click();
 
   await expectOnlyErrors(page, ['name', 'surname', 'email', 'phone', 'cpf', 'store', 'terms']);
