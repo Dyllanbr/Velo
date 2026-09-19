@@ -269,7 +269,7 @@ const Order = () => {
                       onChange={(e) => handleChange('name', e.target.value)}
                       className={cn(errors.name && 'border-destructive')}
                     />
-                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                    {errors.name && <p data-testid="error-name" className="text-sm text-destructive">{errors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="surname">Sobrenome</Label>
@@ -280,7 +280,7 @@ const Order = () => {
                       onChange={(e) => handleChange('surname', e.target.value)}
                       className={cn(errors.surname && 'border-destructive')}
                     />
-                    {errors.surname && <p className="text-sm text-destructive">{errors.surname}</p>}
+                    {errors.surname && <p data-testid="error-surname" className="text-sm text-destructive">{errors.surname}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -292,7 +292,7 @@ const Order = () => {
                       onChange={(e) => handleChange('email', e.target.value)}
                       className={cn(errors.email && 'border-destructive')}
                     />
-                    {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+                    {errors.email && <p data-testid="error-email" className="text-sm text-destructive">{errors.email}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Telefone</Label>
@@ -310,7 +310,7 @@ const Order = () => {
                         />
                       )}
                     </InputMask>
-                    {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+                    {errors.phone && <p data-testid="error-phone" className="text-sm text-destructive">{errors.phone}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cpf">CPF</Label>
@@ -328,7 +328,7 @@ const Order = () => {
                         />
                       )}
                     </InputMask>
-                    {errors.cpf && <p className="text-sm text-destructive">{errors.cpf}</p>}
+                    {errors.cpf && <p data-testid="error-cpf" className="text-sm text-destructive">{errors.cpf}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="store">Loja para Retirada</Label>
@@ -351,7 +351,7 @@ const Order = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    {errors.store && <p className="text-sm text-destructive">{errors.store}</p>}
+                    {errors.store && <p data-testid="error-store" className="text-sm text-destructive">{errors.store}</p>}
                   </div>
                 </div>
               </section>
@@ -459,7 +459,7 @@ const Order = () => {
                         Política de Privacidade
                       </Link>
                     </Label>
-                    {errors.terms && <p className="text-sm text-destructive mt-1">{errors.terms}</p>}
+                    {errors.terms && <p data-testid="error-terms" className="text-sm text-destructive mt-1">{errors.terms}</p>}
                   </div>
                 </div>
               </section>

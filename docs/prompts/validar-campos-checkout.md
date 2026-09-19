@@ -12,18 +12,18 @@ O produto atual tem `type="email"` e validação nativa habilitada. Um endereço
 
 ## Depois, automatizar somente o contrato conferido
 
-Use `app.checkout` de `../support/fixtures`, que preserva a composição de `mock`, o `networkGuard`, a origem local e o Supabase fictício `.invalid`. Nos negativos, reutilize `fillCustomerData`, `selectStore`, `acceptTerms` e `submit` com os dados sintéticos existentes; exponha somente o locator de termos compartilhado em `elements.terms`. O helper `fillCheckout` permanece intacto para os outros consumidores. Confira seus valores finais antes de alterar somente o campo do cenário. O controle positivo já existente em `pedidos.spec.ts` deve continuar capaz de enviar um pedido à API simulada; nenhum acesso real ao banco ou crédito é necessário.
+Use `app.checkout` de `../support/fixtures`, que preserva a composição de `mock`, o `networkGuard`, a origem local e o Supabase fictício `.invalid`. Nos negativos, reutilize `fillCustomerData`, `selectStore`, `acceptTerms` e `submit` com os dados sintéticos existentes; mantenha o checkbox compartilhado em `elements.terms` e os sete locators de erro em `elements.alerts`. O helper `fillCheckout` permanece intacto para os outros consumidores. Confira seus valores finais antes de alterar somente o campo do cenário. O controle positivo já existente em `pedidos.spec.ts` deve continuar capaz de enviar um pedido à API simulada; nenhum acesso real ao banco ou crédito é necessário.
 
-Use o campo como âncora do erro. Hoje o controle com test ID e seu parágrafo de erro pertencem ao mesmo agrupamento em `Order.tsx`; o erro dos termos fica aninhado nesse agrupamento. Um exemplo local é:
+Use o contrato explícito de cada erro. Os sete parágrafos condicionais em `Order.tsx` têm test IDs `error-name`, `error-surname`, `error-email`, `error-phone`, `error-cpf`, `error-store` e `error-terms`, expostos pela factory em `elements.alerts`. Um exemplo local é:
 
 ```ts
-const alert = page.getByTestId('checkout-name').locator('..').getByRole('paragraph');
+const alert = app.checkout.elements.alerts.name;
 await expect(alert).toHaveCount(1);
 await expect(alert).toBeVisible();
 await expect(alert).toHaveText('Nome deve ter pelo menos 2 caracteres');
 ```
 
-O salto ao pai documenta uma dependência pequena da estrutura atual, pois o erro ainda não possui test ID ou associação ARIA própria. Não invente `aria-describedby`, não use índices nem troque isso por uma busca global do texto. Se o DOM mudar, confira novamente o vínculo. Preserve a visibilidade junto do texto e exija ausência de erros nos outros agrupamentos conhecidos. No formulário vazio, confira os sete erros; não conte parágrafos de preço ou financiamento.
+Os IDs de erro foram acrescentados sem mudar schema, texto, classes ou regras do formulário; não dependem mais do salto ao pai do controle. Test ID não comprova acessibilidade: não invente uma associação ARIA nem trate o atributo como oráculo. Preserve cardinalidade, visibilidade e texto, e exija ausência dos demais alertas conhecidos. No formulário vazio, confira os sete erros; não conte parágrafos de preço ou financiamento. O checkbox `elements.terms` e a mensagem `elements.alerts.terms` são elementos distintos. Use o mapa inferido da factory por teste, sem `any` ou alias global mutável; os contratos locais continuam `surname` e `cpf`.
 
 Mantenha a fixture `noPosts`: observar tentativas POST em todo o contexto, inclusive requisições abortadas, anexar `post-attempts.json` e exigir lista vazia. Permanecer em `/order` ou ter uma requisição bloqueada não prova ausência de tentativa. Não simule sucesso nos negativos para ocultar um envio acidental, não adicione esperas fixas e não aumente timeouts para esconder falhas.
 
