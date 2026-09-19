@@ -36,9 +36,13 @@ export function createCheckoutActions(page: Page) {
       await page.getByRole('option', { name: storeName, exact: true }).click();
     },
 
-    async selectPaymentMethod(method: 'À Vista') {
-      // The button's accessible name also includes its price; this option is cash-only.
+    async selectPaymentMethod(method: 'À Vista' | 'Financiamento') {
+      // The button's accessible name also includes its price or installment amount.
       await page.getByRole('button', { name: method }).click();
+    },
+
+    async fillDownPayment(value: string) {
+      await page.getByTestId('input-entry-value').fill(value);
     },
 
     async acceptTerms() {
