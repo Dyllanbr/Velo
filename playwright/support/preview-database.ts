@@ -59,7 +59,7 @@ function displayPrice(total: string): string {
 
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
 }
 
 export function reservedOrderDetailsFromJson(data: unknown): readonly PreviewOrderDetails[] {

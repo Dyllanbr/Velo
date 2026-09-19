@@ -222,6 +222,35 @@ describe('UI-shaped reserved orders map to SQL without duplicating scenario data
 });
 
 describe('external JSON contains only the three authorized scenario datasets', () => {
+  it('accepts own fixture keys on null-prototype objects without opening a Pool', () => {
+    const callsBefore = poolConstructor.mock.calls.length;
+    const input = structuredClone(testData);
+    Object.setPrototypeOf(input, null);
+    Object.setPrototypeOf(input.aprovado, null);
+    Object.setPrototypeOf(input.aprovado.customer, null);
+    expect(reservedOrderDetailsFromJson(input)).toEqual(RESERVED_ORDER_DETAILS);
+    expect(poolConstructor.mock.calls).toHaveLength(callsBefore);
+  });
+
+  it.each(['container', 'scenario', 'customer'] as const)(
+    'rejects an inherited required key even with the exact enumerable count: %s', (level) => {
+      const callsBefore = poolConstructor.mock.calls.length;
+      const input = structuredClone(testData);
+      const object: Record<string, unknown> = level === 'container' ? input
+        : level === 'scenario' ? input.aprovado : input.aprovado.customer;
+      const key = level === 'container' ? 'aprovado' : level === 'scenario' ? 'color' : 'name';
+      const inherited = object[key];
+      delete object[key];
+      Object.setPrototypeOf(object, { [key]: inherited });
+      object.extra = 'preserve the enumerable key count';
+      const message = level === 'container'
+        ? 'Fixture JSON must contain exactly the three reserved scenarios.'
+        : 'Fixture JSON has missing, unexpected or invalid fields; values omitted.';
+      expect(() => reservedOrderDetailsFromJson(input)).toThrow(message);
+      expect(poolConstructor.mock.calls).toHaveLength(callsBefore);
+    },
+  );
+
   it('loads the three scenarios in reserved order with frozen objects and derived prices, without a Pool', () => {
     const callsBefore = poolConstructor.mock.calls.length;
     const orders = reservedOrderDetailsFromJson(testData);
