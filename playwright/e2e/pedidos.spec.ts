@@ -7,6 +7,13 @@ test.describe('Consulta de pedidos', () => {
     await app.orderLookup.open();
   });
 
+  test('consulta mantém busca desabilitada com campo vazio ou apenas espaços', async ({ app }) => {
+    const button = app.orderLookup.elements.searchButton;
+    await expect(button).toBeDisabled();
+    await app.orderLookup.elements.orderInput.fill('   ');
+    await expect(button).toBeDisabled();
+  });
+
   test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page, app }) => {
     const order = orderFixture();
     const expected: OrderDetails = {
