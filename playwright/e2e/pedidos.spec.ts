@@ -102,12 +102,8 @@ test('checkout à vista envia configuração e apresenta o número retornado', a
     } });
   });
 
-  // Arrange: the complete customer journey belongs to this case, not a shared hook.
-  await page.goto('/');
-  const hero = page.getByTestId('hero-section');
-  await expect(hero.getByRole('heading', { name: 'Velô Sprint', level: 1, exact: true })).toBeVisible();
-  await hero.getByRole('link', { name: 'Configure Agora', exact: true }).click();
-  await expect(page).toHaveURL(/\/configure$/);
+  // Keep this journey in the cash case; lookup cases use their own hook.
+  await app.hero.open();
   await app.configurator.expectPrice(price);
   await app.configurator.finishConfigurator();
   await app.checkout.expectLoaded();
@@ -125,8 +121,7 @@ test('checkout à vista envia configuração e apresenta o número retornado', a
   await app.checkout.submit();
 
   // Assert: correlate the displayed number with the actual mocked POST response.
-  await expect(page).toHaveURL(/\/success$/);
-  await expect(page.getByRole('heading', { name: 'Pedido Aprovado!', exact: true })).toBeVisible();
+  await app.checkout.expectResult('Pedido Aprovado!');
   expect(returnedOrderNumbers).toHaveLength(1);
   await expect(page.getByTestId('order-id')).toHaveText(returnedOrderNumbers[0]);
   await expect(page.getByText(`${customer.name} ${customer.surname}`, { exact: true })).toBeVisible();
