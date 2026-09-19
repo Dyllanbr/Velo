@@ -57,6 +57,13 @@ export function createCheckoutActions(page: Page) {
       await expect(page.getByRole('heading', { name: 'Finalizar Pedido', exact: true })).toBeVisible();
     },
 
+    async expectResult(status: string) {
+      await expect(page).toHaveURL(/\/success$/);
+      await expect(page.getByRole('heading', { name: status, exact: true })).toBeVisible();
+      await expect(page.getByTestId('success-status')).toBeVisible();
+      await expect(page.getByTestId('success-status')).toHaveText(status);
+    },
+
     async expectSummaryTotal(price: string) {
       await expect(page.getByTestId('summary-total-price')).toHaveText(price);
     },
