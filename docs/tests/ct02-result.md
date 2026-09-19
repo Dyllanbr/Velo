@@ -58,3 +58,22 @@ Uma execução local dirigida aprovou **3/3 casos Chromium headless**, com um wo
 Imports, tipos e o helper de checkpoints permaneceram iguais. A execução manteve servidor local, fixtures/networkGuard, backend fictício e contexto por teste; não alterou produto, actions, CT03 ou configurações. Os checkpoints continuam verificando preço, opcionais desmarcados, nome/asset/carregamento da imagem, sem comparação de pixels ou afirmação de seleção ARIA inexistente.
 
 Os relatórios JSON/HTML, logs e hashes foram preservados no D. A rodada não repetiu online, CT03 ou a suíte inteira, não acessou banco remoto/crédito e não gerou novas capturas de sucesso. Os aceites manuais e a limitação das imagens não persistidas permanecem históricos acima; esta validação local não prova CI, merge ou deploy.
+
+## Ações do configurador compartilhadas — 19/09/2026, A13
+
+A factory existente `configuratorActions` passou a concentrar seleção de cores/rodas e os checkpoints da configuração. Os três casos CT02 continuam separados, com a mesma sequência, dados e asserções; o spec delega essas operações às actions. A função assíncrona de preço preserva parâmetro `string`, visibilidade e texto, para também atender os valores dos opcionais do CT03. Fixtures, networkGuard, mocks, produto e spec CT03 não foram alterados.
+
+Uma nova execução local dirigida aprovou **4/4 casos Chromium headless**, com um worker, uma tentativa por caso e retry 0: os três CT02 e o CT03, incluído por consumir a action compartilhada. ESLint dos dois arquivos alterados e TypeScript estrito dos dois consumidores/actions também terminaram com saída 0.
+
+| Caso executado nesta rodada | Resultado | Tempo do caso |
+| --- | --- | --- |
+| CT02: cores preto/branco com Aero | Passou | 1,949 s |
+| CT02: Sport→Aero em Glacier Blue | Passou | 0,863 s |
+| CT02: Sport→Aero em Lunar White | Passou | 0,887 s |
+| CT03: adicionar/remover opcionais e conferir resumo no checkout | Passou | 1,051 s |
+
+O relatório Playwright registrou **9,135 s** (9,1 s no stdout), sem skipped, flaky, unexpected ou erros globais. A base foi `86339243649154831b0421f5c6c8a2fde0664b07`, com a refatoração ainda sem commit. Os 19 hashes acompanhados permaneceram estáveis antes/depois de cada etapa; logs e relatórios JSON/HTML foram preservados localmente no D.
+
+Esta é uma aprovação nova do CT03 após a refatoração: preço **R$ 40.000,00 → R$ 45.500,00 → R$ 50.500,00 → R$ 45.000,00 → R$ 40.000,00**, estados dos dois opcionais em cada transição e resumo final Glacier Blue/carbon black/Aero sem opcionais. O cenário termina no checkout, sem enviar pedido. CT02 conserva verificações de preço, opcionais desmarcados, alt/asset/carregamento da imagem, sem comparação de pixels nem estado ARIA de seleção inventado. Não houve banco remoto ou análise de crédito; os demais testes e a suíte inteira não foram repetidos.
+
+Os registros A11/A12 e as conferências manuais acima permanecem históricos. Esta rodada não gera capturas de sucesso, não recupera imagens bloqueadas e não demonstra CI, merge, deploy ou conclusão do curso. Integração e entrega continuam aguardando as 69 aulas e a revisão final.
