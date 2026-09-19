@@ -1,6 +1,6 @@
 # Casos de teste funcionais — Velô Sprint
 
-**Estado: 11 casos definidos; CT02 executado separadamente, com cinco estados aprovados em ambiente local isolado.** O [resultado do CT02](ct02-result.md) registra a conferência de 19/09/2026 UTC. CT01 e CT03–CT11 permanecem planejados, sem execução atribuída a estes roteiros. As tabelas abaixo descrevem resultados esperados; cada execução deve registrar ambiente, versão, dados, evidência e resultado. Base de análise e da interface conferida: código `779d89332b8daf8e25ddb4c1345427808d954fdc`.
+**Estado: 11 casos definidos; CT01 e CT02 executados e aprovados funcionalmente em ambiente local isolado.** Os resultados de [CT01](ct01-result.md) e [CT02](ct02-result.md) registram as conferências de 19/09/2026 UTC e a limitação de preservação das imagens. CT03–CT11, nove casos, permanecem planejados, sem execução atribuída a estes roteiros. As tabelas abaixo descrevem resultados esperados; cada execução deve registrar ambiente, versão, dados, evidência e resultado. A base histórica de análise e da primeira conferência CT02 é `779d89332b8daf8e25ddb4c1345427808d954fdc`; a preparação da rodada local posterior CT01/CT02 registrou `5e66d8fd2968b63d1c38ea60a4cb51b05be99e2b`.
 
 O escopo é o percurso do cliente: apresentação do veículo, configuração, preenchimento do pedido, decisão de crédito e consulta. Desempenho, auditoria de segurança, integração com o provedor real de crédito e perfis administrativos não fazem parte destes 11 casos. A existência de um campo de número do pedido não comprova controle de acesso.
 
