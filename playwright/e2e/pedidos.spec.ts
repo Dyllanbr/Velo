@@ -1,19 +1,13 @@
-import { test, expect, orderFixture, fillCheckout } from '../support/mock';
-import { Navbar } from '../support/components/Navbar';
-import { LandingPage } from '../support/pages/LandingPage';
-import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
+import { test, expect } from '../support/fixtures';
+import { orderFixture, fillCheckout } from '../support/mock';
+import { type OrderDetails } from '../support/actions/orderLookupActions';
 
 test.describe('Consulta de pedidos', () => {
-  let orderLookupPage: OrderLookupPage;
-
-  test.beforeEach(async ({ page }) => {
-    await new LandingPage(page).goto();
-    await new Navbar(page).orderLookupLink();
-    orderLookupPage = new OrderLookupPage(page);
-    await orderLookupPage.validatePageLoaded();
+  test.beforeEach(async ({ app }) => {
+    await app.orderLookup.open();
   });
 
-  test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page }) => {
+  test('consulta normaliza número e exibe pedido aprovado criado pelo próprio teste', async ({ page, app }) => {
     const order = orderFixture();
     const expected: OrderDetails = {
       number: order.order_number,
@@ -29,7 +23,7 @@ test.describe('Consulta de pedidos', () => {
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${order.order_number}`);
       await route.fulfill({ json: [order] });
     });
-    await orderLookupPage.searchOrder(`  ${order.order_number.toLowerCase()}  `);
+    await app.orderLookup.searchOrder(`  ${order.order_number.toLowerCase()}  `);
     const orderGroup = page.getByRole('paragraph')
       .filter({ hasText: /^Pedido$/ })
       .locator('..');
@@ -37,16 +31,16 @@ test.describe('Consulta de pedidos', () => {
     await expect(page.getByText('APROVADO', { exact: true })).toBeVisible();
     await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
 
-    await orderLookupPage.validateOrderDetails(expected);
+    await app.orderLookup.validateOrderDetails(expected);
   });
 
-  test('consulta informa quando não há pedido', async ({ page }) => {
+  test('consulta informa quando não há pedido', async ({ page, app }) => {
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', (route) => route.fulfill({ json: [] }));
-    await orderLookupPage.searchOrder(orderFixture().order_number);
-    await orderLookupPage.validateOrderNotFound();
+    await app.orderLookup.searchOrder(orderFixture().order_number);
+    await app.orderLookup.validateOrderNotFound();
   });
 
-  test('consulta informa quando o código está fora do padrão', async ({ page }) => {
+  test('consulta informa quando o código está fora do padrão', async ({ page, app }) => {
     const orderCode = 'XYZ-999-INVALIDO';
     const requests: string[] = [];
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
@@ -55,8 +49,8 @@ test.describe('Consulta de pedidos', () => {
       expect(new URL(route.request().url()).searchParams.get('order_number')).toBe(`eq.${orderCode}`);
       await route.fulfill({ json: [] });
     });
-    await orderLookupPage.searchOrder(`  ${orderCode.toLowerCase()}  `);
-    await orderLookupPage.validateOrderNotFound();
+    await app.orderLookup.searchOrder(`  ${orderCode.toLowerCase()}  `);
+    await app.orderLookup.validateOrderNotFound();
     expect(requests).toEqual(['GET']);
   });
 });
