@@ -1,5 +1,7 @@
 import { Kysely, PostgresDialect, sql, type Generated, type Insertable } from 'kysely';
 import { Pool, type PoolConfig } from 'pg';
+import { guardPreviewDriver } from './guarded-preview-driver';
+import { createPreviewOperationWindow } from './preview-operation-window';
 import { assertPreviewBuild, previewSettings } from '../../src/lib/preview-safety';
 import type { OrderDetails } from './actions/orderLookupActions';
 import testData from './fixtures/orders.preview.json' with { type: 'json' };
@@ -302,14 +304,23 @@ async function withCleanupPreservingFailure<T>(
 // Closing a session releases the lock even if the process is terminated unexpectedly.
 export async function withOwnedPreviewDatabase<T>(
   env: Environment, marker: unknown, use: (database: PreviewDatabase) => Promise<T>,
+  assertActive = createPreviewOperationWindow(30_000).assertActive,
 ): Promise<T> {
   const settings = previewDatabaseSettings(env);
   assertPreviewBuild(marker, settings.preview); // Before Pool creation or the first SQL write.
+  assertActive();
   const pool = new Pool(settings.pool);
   let connectionFailed = false;
   pool.on('error', () => { connectionFailed = true; });
   pool.on('connect', (client) => { client.on('error', () => { connectionFailed = true; }); });
-  const db = new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
+  class GuardedDialect extends PostgresDialect {
+    override createDriver() {
+      return guardPreviewDriver(super.createDriver(), assertActive, (query) =>
+        query.sql.trim().replace(/\s+/g, ' ') === 'select pg_catalog.pg_advisory_unlock($1::int, $2::int) as released'
+        && query.parameters.length === 2 && query.parameters[0] === LOCK_NAMESPACE && query.parameters[1] === LOCK_SUITE);
+    }
+  }
+  const db = new Kysely<Database>({ dialect: new GuardedDialect({ pool }) });
   return withCleanupPreservingFailure(async () => {
     // Preserve ordinary UI assertions, but sanitize acquisition/release driver failures.
     let callbackFailed = false;
@@ -324,7 +335,11 @@ export async function withOwnedPreviewDatabase<T>(
         }
         return withCleanupPreservingFailure(async () => {
           let result: T;
-          try { result = await use(repository(connection)); } catch (error) {
+          try {
+            assertActive();
+            result = await use(repository(connection));
+            assertActive();
+          } catch (error) {
             callbackFailed = true;
             callbackFailure = error;
             throw error;
@@ -352,10 +367,11 @@ export async function withOwnedPreviewDatabase<T>(
 export async function withOwnedPreviewCheckout<T>(
   env: Environment, marker: unknown, fixture: unknown,
   use: (database: Pick<PreviewDatabase, 'prepareCheckout' | 'readCheckout'>) => Promise<T>,
+  assertActive = createPreviewOperationWindow(30_000).assertActive,
 ): Promise<T> {
   assertCheckoutFixture(fixture);
   return withOwnedPreviewDatabase(env, marker, (database) => use({
     prepareCheckout: () => database.prepareCheckout(),
     readCheckout: () => database.readCheckout(),
-  }));
+  }), assertActive);
 }

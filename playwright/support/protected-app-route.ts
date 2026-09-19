@@ -1,4 +1,7 @@
 import type { Route } from '@playwright/test';
+import { protectResponse } from './protected-response';
+
+type OperationGuard = { bypassSecret?: string; assertActive?: () => void };
 
 type ProtectedResponse = { status: number; headers: Record<string, string>; body: Buffer };
 type ProtectedRoute = Pick<Route, 'request' | 'fulfill' | 'abort'>;
@@ -11,25 +14,31 @@ export async function fetchProtectedApp(
   headers: Record<string, string>,
   method = 'GET',
   body?: Buffer | null,
+  guard: OperationGuard = {},
 ): Promise<ProtectedResponse> {
   let url: URL;
   try { url = new URL(target); } catch { throw new Error('Invalid protected application URL.'); }
   if (url.origin !== deploymentOrigin || url.username || url.password) {
     throw new Error('Protected headers require the exact deployment origin without credentials.');
   }
+  const bypass = guard.bypassSecret ?? Object.entries(headers)
+    .find(([name]) => name.toLowerCase() === 'x-vercel-protection-bypass')?.[1];
   try {
+    guard.assertActive?.();
     const response = await fetch(url, {
       method, headers, body: body ? new Uint8Array(body) : undefined,
       redirect: 'manual', signal: AbortSignal.timeout(30_000),
     });
+    try { guard.assertActive?.(); } catch (error) {
+      await response.body?.cancel();
+      throw error;
+    }
     const responseHeaders = Object.fromEntries(response.headers);
-    // Native fetch decodes the body. Let route.fulfill compute its new length.
-    delete responseHeaders['content-encoding'];
-    delete responseHeaders['content-length'];
-    delete responseHeaders['transfer-encoding'];
+    // protectResponse inspects every original header, then keeps only safe fields.
+    // Native fetch decodes the body; obsolete compression/length headers are omitted.
     if (response.status >= 300 && response.status < 400) {
       await response.body?.cancel();
-      return { status: response.status, headers: responseHeaders, body: Buffer.alloc(0) };
+      return protectResponse({ status: response.status, headers: responseHeaders, body: Buffer.alloc(0) }, bypass);
     }
     const chunks: Buffer[] = [];
     let length = 0;
@@ -38,7 +47,9 @@ export async function fetchProtectedApp(
       let finished = false;
       try {
         while (!finished) {
+          guard.assertActive?.();
           const chunk = await reader.read();
+          guard.assertActive?.();
           finished = chunk.done;
           if (chunk.done) break;
           length += chunk.value.length;
@@ -49,7 +60,8 @@ export async function fetchProtectedApp(
         try { if (!finished) await reader.cancel(); } finally { reader.releaseLock(); }
       }
     }
-    return { status: response.status, headers: responseHeaders, body: Buffer.concat(chunks) };
+    guard.assertActive?.();
+    return protectResponse({ status: response.status, headers: responseHeaders, body: Buffer.concat(chunks) }, bypass);
   } catch {
     throw new Error('Protected application request failed; request headers and cause omitted.');
   }
@@ -61,12 +73,16 @@ export async function fulfillProtectedAppRoute(
   deploymentOrigin: string,
   appHeaders: Record<string, string>,
   recordRedirect: (status: number) => Promise<void>,
+  guard: OperationGuard = {},
 ): Promise<void> {
   const request = route.request();
   let response: ProtectedResponse;
   try {
+    const headers = Object.fromEntries(Object.entries(request.headers())
+      .filter(([name]) => ['accept', 'accept-language'].includes(name.toLowerCase())));
     response = await fetchProtectedApp(request.url(), deploymentOrigin,
-      { ...request.headers(), ...appHeaders }, request.method(), request.postDataBuffer());
+      { ...headers, ...appHeaders }, request.method(), request.postDataBuffer(), guard);
+    guard.assertActive?.();
   } catch {
     await route.abort();
     throw new Error('Protected application request failed; request headers and cause omitted.');

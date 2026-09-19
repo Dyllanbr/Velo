@@ -3,17 +3,12 @@ import { assertPreviewBuild } from '../../src/lib/preview-safety';
 import { previewDatabaseSettings } from './preview-database';
 import { RESERVED_CHECKOUT, assertOwnedCheckoutRows } from './preview-checkout';
 import { fetchProtectedApp } from './protected-app-route';
+import { assertNoBypassReflection } from './protected-response';
+export { assertNoBypassReflection } from './protected-response';
 
 type Environment = Record<string, string | undefined>;
 export class CheckoutHttpGuardError extends Error {}
 const fail = (message: string): never => { throw new CheckoutHttpGuardError(message); };
-
-export function assertNoBypassReflection(response: { body: Buffer; headers: Record<string, string> }, bypass: string) {
-  if (!bypass || response.body.includes(Buffer.from(bypass))
-    || Object.values(response.headers).some((value) => value.includes(bypass))) {
-    fail('Protected response reflected a secret or the guard key is missing; content and headers omitted.');
-  }
-}
 
 export function checkoutPreviewSettings(env: Environment) {
   if (env.E2E_PREVIEW_CHECKOUT_ALLOWED !== 'true') fail('Checkout preview requires its separate explicit opt-in.');
@@ -97,10 +92,10 @@ export function validateCheckoutResponse(body: Buffer, post: CheckoutPost) {
 }
 
 // Native transport only: never put bypass or backend headers into Playwright API steps.
-export async function verifyCheckoutDeployment(preview: Preview) {
+export async function verifyCheckoutDeployment(preview: Preview, assertActive?: () => void) {
   const appHeaders = { 'x-vercel-protection-bypass': preview.bypassSecret! };
   const read = async (url: string) => {
-    const response = await fetchProtectedApp(url, preview.baseURL, appHeaders);
+    const response = await fetchProtectedApp(url, preview.baseURL, appHeaders, 'GET', undefined, { assertActive });
     if (response.status !== 200) return fail('Preview preflight requires direct HTTP 200; no SQL started.');
     assertNoBypassReflection(response, preview.bypassSecret!);
     return response.body;
