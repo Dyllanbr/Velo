@@ -6,7 +6,33 @@ import { expect, type Page } from '@playwright/test';
 export function createCheckoutActions(page: Page) {
   const configuration = page.getByRole('list').filter({ has: page.getByText('Cor', { exact: true }) });
 
+  const terms = page.getByRole('checkbox', {
+    name: 'Li e aceito os Termos de Uso e Política de Privacidade', exact: true,
+  });
+
   return {
+    elements: { terms },
+
+    async fillCustomerData(data: { name: string; surname: string; email: string; phone: string; cpf: string }) {
+      await page.getByTestId('checkout-name').fill(data.name);
+      await page.getByTestId('checkout-surname').fill(data.surname);
+      await page.getByTestId('checkout-email').fill(data.email);
+      await page.getByTestId('checkout-phone').fill(data.phone);
+      await page.getByTestId('checkout-cpf').fill(data.cpf);
+    },
+
+    async selectStore(storeName: string) {
+      await page.getByTestId('checkout-store').click();
+      await page.getByRole('option', { name: storeName, exact: true }).click();
+    },
+
+    async acceptTerms() {
+      await terms.check();
+    },
+
+    async submit() {
+      await page.getByRole('button', { name: 'Confirmar Pedido', exact: true }).click();
+    },
     async expectLoaded() {
       await expect(page).toHaveURL(/\/order$/);
       await expect(page.getByRole('heading', { name: 'Finalizar Pedido', exact: true })).toBeVisible();
