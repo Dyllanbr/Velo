@@ -11,4 +11,6 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   repeatEach: 1,
+  // Do not retain DOM pixels if a protected response unexpectedly reaches the UI.
+  use: { ...previewConfig.use, trace: 'off', video: 'off', screenshot: 'off' },
 });
