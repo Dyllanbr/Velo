@@ -35,8 +35,12 @@ for (const outcome of outcomes) {
 
     await page.goto('/order');
     await fillCheckout(page, fixture.customer_email);
+    await expect(page.getByTestId('summary-total-price')).toHaveText('R$ 40.000,00');
     await page.getByTestId('payment-financiamento').click();
     await page.getByRole('spinbutton', { name: 'Valor da Entrada', exact: true }).fill('0');
+    // Characterizes the zero-entry example shown in the course; not a general interest-rule approval.
+    await expect(page.getByTestId('summary-total-price')).toHaveText('R$ 40.800,00');
+    const summaryTotalBeforeSubmit = await page.getByTestId('summary-total-price').innerText();
     await page.getByRole('button', { name: 'Confirmar Pedido', exact: true }).click();
 
     await expect(page).toHaveURL(/\/success$/);
@@ -45,10 +49,12 @@ for (const outcome of outcomes) {
     expect(orders).toHaveLength(1);
     expect(orders[0]).toMatchObject({
       status: outcome.status, payment_method: 'financiamento', customer_email: fixture.customer_email,
+      customer_cpf: fixture.customer_cpf, total_price: 40_800,
     });
     await testInfo.attach('credit-decision-and-ui.json', {
       contentType: 'application/json',
       body: JSON.stringify({ creditRequests, mockedScore: outcome.score, submittedOrder: orders[0],
+        summaryTotalBeforeSubmit, expectedZeroEntryTotal: 40_800,
         headingObserved: await page.getByTestId('success-status').innerText(),
         expectedHeading: outcome.heading, scope: 'Local UI and application logic; all APIs mocked.' }, null, 2),
     });
