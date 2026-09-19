@@ -46,7 +46,7 @@ export function createConfiguratorActions(page: Page) {
       await expect(image).toBeVisible();
       await expect(image).toHaveAttribute(
         'src',
-        new RegExp(`/${expected.color}-${expected.wheels}-wheels\\.png(?:\\?.*)?$`),
+        new RegExp(`/${expected.color}-${expected.wheels}-wheels(?:-[A-Za-z0-9_-]{8})?\\.png(?:\\?.*)?$`),
       );
       await expect(image).toHaveJSProperty('complete', true);
       await expect.poll(async () => image.evaluate(
