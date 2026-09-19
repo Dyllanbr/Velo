@@ -82,8 +82,44 @@ withOwnedPreviewCheckout valida a massa exata antes de criar Pool; depois reutil
 
 Somente IDs efetivamente observados e aprovados podem ser excluídos, com CPF E e-mail exatos no mesmo DELETE parametrizado. A contagem deve coincidir, e uma segunda leitura deve provar ausência antes de commit; falha desfaz a transação. Não existe INSERT nesse suporte. O lock continua durante o callback da UI; readCheckout exige exatamente um pedido com assinatura própria, permitindo correlacionar seus IDs com HTTP/UI. O término apenas libera conexão/lock/pool, preservando o pedido para investigação. O lock é cooperativo e a ausência é uma observação transacional, não uma garantia contra escritores externos que ignorem a suíte.
 
-Os métodos prepare e readOwnedRows, as três reservas, o guard GET de consulta e o lifecycle anterior foram preservados. Não se acrescentou autorização HTTP de compra ao guard existente, nem cenário remoto de checkout: os seis casos SQL de consulta continuam separados. Uma futura integração terá de autorizar exatamente um POST dirigido, validar payload, manter o bypass fora de Supabase/relatórios e registrar duas rodadas (limpa antes, mantém um depois), sem inferir execução por esse suporte.
+Os métodos prepare e readOwnedRows, as três reservas, o guard GET de consulta e o lifecycle anterior foram preservados. Na etapa de suporte SQL validada abaixo, ainda não existia cenário remoto de checkout. A integração HTTP foi implementada posteriormente em configuração e arquivos separados, conforme a seção seguinte; não amplia a permissão HTTP dos seis casos de consulta. Implementação não comprova execução de compra real.
 
 Em 19/09/2026, entre 14:00:27 e 14:00:49 UTC, este suporte concluiu lint dirigido, checagem de tipos da aplicação e checagem estrita dos arquivos envolvidos, todos com saída 0. O Vitest aprovou **172/172 casos**: 121 do suporte de consulta e 51 do checkout, sem falhas, skips ou todo, com um worker e retry 0. Os testes substituem pg por transporte em memória; não houve conexão SQL real nem execução remota de checkout. A tentativa anterior foi interrompida por TS2367 na asserção unitária de que o e-mail do checkout não pertence às reservas de consulta. A asserção foi reescrita como verificação de não pertencimento da lista, preservando a intenção e sem desativar a checagem de tipos.
 
 O resultado histórico de 9/9 E2E locais validou os campos e test IDs, mas não cobre persistência real deste suporte. Não há novo resultado de crédito, banco ou deploy. Merge, deploy e entrega continuam aguardando as 69 aulas e a revisão final.
+
+## Integração HTTP/UI/SQL da compra — implementada, execução remota pendente
+
+`playwright.checkout-database.config.ts` descobre somente `playwright/checkout-database/compra.spec.ts`. O helper `playwright/support/preview-checkout-http.ts` delimita destino, autorização de escrita, resposta e identidade do deployment; `src/lib/preview-checkout-http.test.ts` verifica suas funções puras. A suíte de consulta permanece separada e não ganha permissão POST.
+
+Além das variáveis e guardas da seção de configuração, a compra exige **`E2E_PREVIEW_CHECKOUT_ALLOWED=true`**. O opt-in de banco e o opt-in de preview também continuam obrigatórios. Esta configuração exige bypass não vazio fornecido privadamente ao processo Node; não automatiza login ou OTP. Nenhum segredo deve entrar em comandos compartilhados, código, `VITE_*` ou relatórios.
+
+Com o ambiente privado autorizado e preparado, o comando específico é:
+
+```powershell
+node .\node_modules\@playwright\test\cli.js test --config playwright.checkout-database.config.ts --workers=1 --retries=0
+```
+
+Executar as **duas rodadas juntas**, sem filtrar apenas a segunda nem introduzir retries/repetições. A configuração usa um worker, modo serial, `repeatEach: 1` e timeout de 120 segundos por caso. Trace, vídeo e screenshot automáticos ficam desligados nessa configuração protegida.
+
+### O que cada rodada deve demonstrar
+
+Antes de abrir Pool ou limpar a massa, o preflight lê marcador, HTML e bundles pela origem exata do app. Confere preview/ref/SHA, chave pública e destino do bundle, rejeita produção e credenciais privilegiadas detectadas. Essas leituras são uma condição para prosseguir, não um novo deploy.
+
+A preparação SQL já descrita é aguardada antes da navegação. O caso percorre home → configurador padrão → checkout à vista → sucesso, confere configuração sem opcionais, total 40.000, cliente e loja. O navegador só pode enviar um POST à rota exata `/rest/v1/orders?select=*` do preview; o payload precisa corresponder à reserva. São permitidos apenas os preflights POST delimitados. A permissão de escrita é consumida sincronamente antes do envio e não é rearmada após falha ou resposta incerta.
+
+A resposta precisa ser HTTP 201, corresponder ao número enviado e satisfazer a assinatura própria. UUID/número são correlacionados entre HTTP, confirmação e leitura SQL. Ao terminar a primeira rodada, um pedido próprio deve permanecer. Antes de limpar na segunda, a leitura deve encontrar a mesma identidade da primeira; a preparação exclui exatamente esse pedido. A nova compra deve gerar UUID e número diferentes, e a leitura final exige novamente **um pedido próprio**, sem excluir registros alheios ou limpar no teardown. Não se espera manter os dois pedidos simultaneamente: retém-se o resultado de cada rodada até a próxima preparação.
+
+### Transporte, encerramento e evidência
+
+O transporte nativo Node mantém o bypass fora de `route.fetch`/`APIRequestContext`, enviando-o somente à origem do app. Para Supabase, constrói uma lista própria de headers; não copia bypass, cookies ou autorização arbitrária do navegador. Redirects não são seguidos. Antes de aceitar ou entregar uma resposta ao navegador, o guard procura o valor literal do bypass no corpo e headers; reflexão causa falha com mensagem sem conteúdo. Headers de cookie e bypass são removidos das respostas entregues. Isso não é prova universal contra todas as formas possíveis de transformação de um segredo.
+
+`performance.now()` estabelece uma janela monotônica para iniciar limpeza e operações de rede, de no máximo 60 segundos com margem no timeout. A página fechada ou o fim da janela impede novas operações. Essa guarda não cancela retroativamente trabalho nativo já em andamento: o encerramento aguarda os handlers de rota, conserva o bloqueio de novas requisições e preserva a falha antes de liberar lock/conexão/pool. Uma falha de rede mantém as requisições seguintes bloqueadas; não dispara outra compra.
+
+Os anexos `checkout-database-evidence.json` e `checkout-lifecycle-completed.json` registram identidades e contagens da massa própria, hashes da identidade do app, contagens de tentativas/autorização/envio/aceite e conclusão do lifecycle, sem headers, payload completo ou valores de credenciais. O primeiro também pode existir em execução incompleta: `bodyCompleted` e o resultado do teste precisam ser conferidos, não apenas a existência do anexo.
+
+### Validação desta integração
+
+Em 19/09/2026, entre 14:33:06 e 14:33:23 UTC, lint dirigido, TSC da aplicação e TSC estrito terminaram com saída 0. **24/24 unitários** de um arquivo passaram, sem falhas, pendências ou todo; um worker, retry 0 e sem paralelismo entre arquivos. Foram preservados 43 pins de fonte e sete preparados. Esses casos cobrem gate, payload, permissão única, correlação e reflexão com funções puras/callbacks simulados. Não abriram navegador, transporte nativo remoto ou PostgreSQL real.
+
+Os **172/172** da seção anterior são o resultado histórico do suporte SQL e não foram repetidos nem somados a esta execução. Em 19/09/2026, entre 14:37:47 e 14:38:08 UTC, o laboratório privado de transporte cumpriu seu contrato de **13 instâncias: seis sucessos e sete falhas deliberadas**, com scanner aprovado, sem erros globais, skips ou retries. O controle detectou a chave fictícia nos relatórios instrumentados; o transporte nativo não a expôs nos artefatos examinados, incluindo JSON e conteúdo ZIP do HTML. O ensaio usou dois servidores loopback, helpers reais e trechos extraídos do spec, sem credenciais reais ou SQL. Uma primeira tentativa, preservada, falhou porque coletava uma cópia histórica e repetia um callback no encerramento; a correção ficou restrita ao laboratório. Esse resultado não é a execução completa do produto. **As duas compras remotas continuam pendentes**, assim como os seis casos SQL de consulta. Nenhum destes preparos autoriza merge, deploy ou entrega antes das 69 aulas e da revisão final.
