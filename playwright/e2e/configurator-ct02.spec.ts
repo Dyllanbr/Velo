@@ -32,31 +32,49 @@ async function expectConfiguration(
   )).toBeGreaterThan(0);
 }
 
-test('CT02 - cores preservam o preço e Sport acrescenta somente R$ 2.000,00', async ({ page }) => {
-  // Arrange: contexto novo da fixture; nenhum reset do produto para mascarar o estado inicial.
-  await page.goto('/configure');
-  await expectConfiguration(page, {
-    color: 'glacier-blue', wheels: 'aero', price: 'R$ 40.000,00',
+test.describe('Customização do veículo', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/configure');
+    await expectConfiguration(page, {
+      color: 'glacier-blue', wheels: 'aero', price: 'R$ 40.000,00',
+    });
   });
 
-  // Act / Assert: os cinco estados vêm da exploração CUA documentada.
-  await page.getByRole('button', { name: 'Midnight Black', exact: true }).click();
-  await expectConfiguration(page, {
-    color: 'midnight-black', wheels: 'aero', price: 'R$ 40.000,00',
+  test('CT02 - cores atualizam a imagem sem alterar o preço base', async ({ page }) => {
+    await page.getByRole('button', { name: 'Midnight Black', exact: true }).click();
+    await expectConfiguration(page, {
+      color: 'midnight-black', wheels: 'aero', price: 'R$ 40.000,00',
+    });
+
+    await page.getByRole('button', { name: 'Lunar White', exact: true }).click();
+    await expectConfiguration(page, {
+      color: 'lunar-white', wheels: 'aero', price: 'R$ 40.000,00',
+    });
   });
 
-  await page.getByRole('button', { name: 'Lunar White', exact: true }).click();
-  await expectConfiguration(page, {
-    color: 'lunar-white', wheels: 'aero', price: 'R$ 40.000,00',
-  });
+  const wheelScenarios = [
+    { color: 'glacier-blue', label: 'Glacier Blue' },
+    { color: 'lunar-white', label: 'Lunar White' },
+  ] as const;
 
-  await page.getByRole('button', { name: /^Sport Wheels\b/ }).click();
-  await expectConfiguration(page, {
-    color: 'lunar-white', wheels: 'sport', price: 'R$ 42.000,00',
-  });
+  for (const scenario of wheelScenarios) {
+    test(`CT02 - rodas atualizam imagem e preço e retornam a Aero em ${scenario.label}`, async ({ page }) => {
+      if (scenario.color === 'lunar-white') {
+        await page.getByRole('button', { name: scenario.label, exact: true }).click();
+        await expectConfiguration(page, {
+          color: scenario.color, wheels: 'aero', price: 'R$ 40.000,00',
+        });
+      }
 
-  await page.getByRole('button', { name: /^Aero Wheels\b/ }).click();
-  await expectConfiguration(page, {
-    color: 'lunar-white', wheels: 'aero', price: 'R$ 40.000,00',
-  });
+      await page.getByRole('button', { name: /^Sport Wheels\b/ }).click();
+      await expectConfiguration(page, {
+        color: scenario.color, wheels: 'sport', price: 'R$ 42.000,00',
+      });
+
+      await page.getByRole('button', { name: /^Aero Wheels\b/ }).click();
+      await expectConfiguration(page, {
+        color: scenario.color, wheels: 'aero', price: 'R$ 40.000,00',
+      });
+    });
+  }
 });
