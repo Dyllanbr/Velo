@@ -4,6 +4,9 @@ import { assertPreviewBuild, previewSettings } from '../../src/lib/preview-safet
 import type { OrderDetails } from './actions/orderLookupActions';
 import testData from './fixtures/orders.preview.json' with { type: 'json' };
 
+import { assertCheckoutFixture, assertOwnedCheckoutRows, MAX_CHECKOUT_ROWS,
+  RESERVED_CHECKOUT, type CheckoutRow } from './preview-checkout';
+
 export const DATABASE_PREVIEW_REF = 'bcsepghyrzmabmmdinuy';
 const LOCK_NAMESPACE = 1704192026;
 const LOCK_SUITE = 234032019;
@@ -200,7 +203,53 @@ function repository(connection: Kysely<Database>) {
     // More than three candidates is already a conflict; no unrelated payload is read.
     .limit(4).execute();
 
+  const checkoutCandidates = (db: Kysely<Database>) => db.withSchema('public').selectFrom('orders')
+    .select(['id', 'order_number', 'customer_name', 'customer_email', 'customer_phone', 'customer_cpf',
+      'color', 'wheel_type', 'optionals', 'payment_method', 'total_price', 'status'])
+    .where((eb) => eb.or([
+      eb('customer_cpf', '=', RESERVED_CHECKOUT.cpf),
+      eb('customer_email', '=', RESERVED_CHECKOUT.email),
+    ])).limit(MAX_CHECKOUT_ROWS + 1);
+
+  const checkCheckoutRows = (rows: readonly CheckoutRow[]) => {
+    try { assertOwnedCheckoutRows(rows); } catch {
+      throw new DatabaseGuardError('Checkout ownership conflict or limit exceeded; no deletion is allowed.');
+    }
+    if (rows.some((row) => RESERVED_ORDERS.some((owner) => owner.id === row.id
+      || owner.order_number === row.order_number))) {
+      throw new DatabaseGuardError('Checkout conflicts with a reserved lookup identity; no deletion is allowed.');
+    }
+  };
+
   return {
+    async prepareCheckout() {
+      return databaseOperation(() => table.transaction().setIsolationLevel('serializable').execute(async (transaction) => {
+        const before = await checkoutCandidates(transaction).forUpdate().execute();
+        checkCheckoutRows(before); // Validate all candidates before the first DELETE.
+        const deletedOrders = before.map(({ id, order_number }) => ({ id, order_number }));
+        if (before.length > 0) {
+          const deleted = await transaction.deleteFrom('orders')
+            .where('id', 'in', before.map((row) => row.id))
+            .where('customer_cpf', '=', RESERVED_CHECKOUT.cpf)
+            .where('customer_email', '=', RESERVED_CHECKOUT.email).executeTakeFirst();
+          if (deleted.numDeletedRows !== BigInt(before.length)) {
+            throw new DatabaseGuardError('Checkout deletion count changed; transaction must roll back.');
+          }
+        }
+        if ((await checkoutCandidates(transaction).execute()).length !== 0) {
+          throw new DatabaseGuardError('Checkout identity is not absent; transaction must roll back.');
+        }
+        return { deletedBeforeCheckout: before.length, deletedOrders, absentBeforeCheckout: true as const };
+      })); // Commit before UI; this method never inserts or deletes in teardown.
+    },
+    async readCheckout() {
+      return databaseOperation(async () => {
+        const rows = await checkoutCandidates(table).execute();
+        checkCheckoutRows(rows);
+        if (rows.length !== 1) throw new DatabaseGuardError('Checkout must retain exactly one owned order.');
+        return rows[0];
+      });
+    },
     async prepare(order: PreviewOrderDetails) {
       const owner = toOwnedOrderInsert(order); // Validate and map before opening the write transaction.
       return databaseOperation(() => table.transaction().execute(async (transaction) => {
@@ -296,4 +345,17 @@ export async function withOwnedPreviewDatabase<T>(
       throw new DatabaseGuardError('Preview database connection failed; driver details and credentials omitted.');
     }
   }, () => databaseOperation(() => db.destroy()));
+}
+
+// Validate the caller's dataset before any Pool, then bind methods to the fixed reservation.
+// The underlying lifecycle/lock is shared with the lookup suite and remains unchanged.
+export async function withOwnedPreviewCheckout<T>(
+  env: Environment, marker: unknown, fixture: unknown,
+  use: (database: Pick<PreviewDatabase, 'prepareCheckout' | 'readCheckout'>) => Promise<T>,
+): Promise<T> {
+  assertCheckoutFixture(fixture);
+  return withOwnedPreviewDatabase(env, marker, (database) => use({
+    prepareCheckout: () => database.prepareCheckout(),
+    readCheckout: () => database.readCheckout(),
+  }));
 }
