@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import InputMask from 'react-input-mask';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { z } from 'zod';
+import { orderSchema, type OrderFormData as FormData } from '@/lib/order-schema';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,18 +57,6 @@ const stores = [
   'Velô Morumbi - Av. Morumbi, 1500',
   'Velô Ibirapuera - Av. Ibirapuera, 3000',
 ];
-
-const orderSchema = z.object({
-  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  surname: z.string().min(2, 'Sobrenome deve ter pelo menos 2 caracteres'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().regex(/^\(\d{2}\) \d{5}-\d{4}$/, 'Telefone inválido'),
-  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, 'CPF inválido'),
-  store: z.string().min(1, 'Selecione uma loja'),
-  terms: z.boolean().refine((val) => val === true, 'Aceite os termos'),
-});
-
-type FormData = z.infer<typeof orderSchema>;
 
 const colorLabels: Record<ExteriorColor, string> = {
   'glacier-blue': 'Glacier Blue',
