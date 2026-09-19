@@ -41,7 +41,7 @@ const statusPresentations = {
   },
   REPROVADO: {
     Icon: XCircle, color: 'text-destructive', background: 'bg-destructive/10',
-    title: 'Crédito Reprovado',
+    title: 'Pedido Reprovado!',
     message: 'Infelizmente seu crédito não foi aprovado. Tente novamente com pagamento à vista.',
   },
   EM_ANALISE: {
