@@ -1,15 +1,9 @@
-import { test, expect, orderFixture } from '../support/mock';
-import { Navbar } from '../support/components/Navbar';
-import { LandingPage } from '../support/pages/LandingPage';
-import { OrderLookupPage, type OrderDetails } from '../support/pages/OrderLookupPage';
+import { test, expect } from '../support/fixtures';
+import { orderFixture } from '../support/mock';
+import { type OrderDetails } from '../support/actions/orderLookupActions';
 
-let orderLookupPage: OrderLookupPage;
-
-test.beforeEach(async ({ page }) => {
-  await new LandingPage(page).goto();
-  await new Navbar(page).orderLookupLink();
-  orderLookupPage = new OrderLookupPage(page);
-  await orderLookupPage.validatePageLoaded();
+test.beforeEach(async ({ app }) => {
+  await app.orderLookup.open();
 });
 
 const outcomes = [
@@ -20,7 +14,7 @@ const outcomes = [
 ] as const;
 
 for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
-  test(`consulta preserva o status ${outcome.status} retornado pela API`, async ({ page }, testInfo) => {
+  test(`consulta preserva o status ${outcome.status} retornado pela API`, async ({ page, app }, testInfo) => {
     const order = { ...orderFixture(), status: outcome.status };
     const requests: string[] = [];
     await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
@@ -30,14 +24,14 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
       await route.fulfill({ json: [order] });
     });
 
-    await orderLookupPage.searchOrder(order.order_number);
+    await app.orderLookup.searchOrder(order.order_number);
     const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
     await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
     await expect(page.getByText(outcome.status, { exact: true })).toBeVisible();
     await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
     expect(requests).toEqual(['GET']);
 
-    await orderLookupPage.validateStatusBadge(order.order_number, outcome.status);
+    await app.orderLookup.validateStatusBadge(order.order_number, outcome.status);
 
     await testInfo.attach('consulta.png', {
       contentType: 'image/png', body: await page.screenshot({ animations: 'disabled' }),
@@ -53,7 +47,7 @@ for (const outcome of outcomes.filter((item) => item.status !== 'REPROVADO')) {
   });
 }
 
-test('consulta preserva o status REPROVADO retornado pela API', async ({ page }, testInfo) => {
+test('consulta preserva o status REPROVADO retornado pela API', async ({ page, app }, testInfo) => {
   const order = {
     ...orderFixture(),
     status: 'REPROVADO' as const,
@@ -81,16 +75,16 @@ test('consulta preserva o status REPROVADO retornado pela API', async ({ page },
     await route.fulfill({ json: [order] });
   });
 
-  await orderLookupPage.searchOrder(order.order_number);
+  await app.orderLookup.searchOrder(order.order_number);
   const orderGroup = page.getByRole('paragraph').filter({ hasText: /^Pedido$/ }).locator('..');
   await expect(orderGroup.getByText(order.order_number, { exact: true })).toBeVisible();
   await expect(page.getByText(order.status, { exact: true })).toBeVisible();
   await expect(page.getByText(order.customer_email, { exact: true })).toBeVisible();
   expect(requests).toEqual(['GET']);
 
-  await orderLookupPage.validateStatusBadge(order.order_number, order.status);
+  await app.orderLookup.validateStatusBadge(order.order_number, order.status);
 
-  await orderLookupPage.validateOrderDetails(expected);
+  await app.orderLookup.validateOrderDetails(expected);
   for (const other of outcomes.filter((item) => item.status !== 'REPROVADO')) {
     await expect(page.getByText(other.status, { exact: true })).toHaveCount(0);
     if (other.message) await expect(page.getByText(other.message, { exact: true })).toHaveCount(0);
