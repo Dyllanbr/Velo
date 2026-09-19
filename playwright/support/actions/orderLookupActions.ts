@@ -13,7 +13,11 @@ export type OrderDetails = {
 };
 
 export function createOrderLookupActions(page: Page) {
+  const orderInput = page.getByRole('textbox', { name: 'Número do Pedido', exact: true });
+  const searchButton = page.getByRole('button', { name: 'Buscar Pedido', exact: true });
+
   return {
+    elements: { orderInput, searchButton },
     async open() {
       await page.goto('/');
       await expect(page.getByTestId('hero-section').getByRole('heading', {
@@ -28,8 +32,8 @@ export function createOrderLookupActions(page: Page) {
     },
 
     async searchOrder(code: string) {
-      await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(code);
-      await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
+      await orderInput.fill(code);
+      await searchButton.click();
     },
 
     async validateOrderDetails(order: OrderDetails) {
