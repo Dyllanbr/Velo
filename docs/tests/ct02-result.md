@@ -23,3 +23,22 @@ Uma nova execução interativa pelo navegador CUA confirmou os mesmos cinco esta
 Os cinco estados passaram na primeira observação desta rodada, sem quadro desatualizado registrado. Foram capturadas e conferidas cinco imagens reais em JPEG na sessão, com SHA-256 dos bytes originais. **Os arquivos não foram persistidos: o navegador bloqueou o envio ao formulário local com `ERR_BLOCKED_BY_CLIENT`. Não há novas imagens anexadas.** A aprovação funcional permanece separada dessa pendência de preservação. O resultado anterior e seu limite de evidência continuam preservados acima.
 
 Esta execução não criou pedido, não chamou o provedor de crédito e não demonstra uso de Playwright MCP no Cursor ou do Antigravity. O aceite permanece restrito às cores, rodas e preços observados.
+
+## Automação derivada da exploração — 19/09/2026, A11
+
+O [cenário Playwright dedicado](../../playwright/e2e/configurator-ct02.spec.ts), guiado pelo [prompt próprio de duas fases](../prompts/automatizar-caso-observado.md), passou em execução local separada das conferências manuais acima. Ele percorre os cinco estados do CT02, inclusive Lunar White, preservando opcionais desmarcados e as fixtures/guardas existentes. Não cria pedido nem chama crédito.
+
+| Validação realizada | Resultado |
+| --- | --- |
+| ESLint dirigido ao novo spec | Exit 0 |
+| TypeScript estrito dirigido ao spec e suas importações | Exit 0; ES2022/ESNext, resolução Bundler e DOM |
+| CT02 Chromium headless | **1/1 aprovado**, um worker, uma tentativa e retry 0 |
+| Duração | 2,530 s no caso; 7,509 s no relatório Playwright |
+| Casos ignorados/flaky e erros globais | Zero |
+| Fontes antes/depois | 19 hashes estáveis em cada etapa |
+
+A janela do monitor foi de **03:50:43.570 a 03:51:00.811 UTC**, com OBS inativo. Playwright 1.58.2 e Node 24.14.0. A execução usou a base `df4c98c89ab09f75ee92ae1f206f4be2a29440fc` com o novo spec ainda sem commit; SHA-256 do arquivo testado: `c46fe8e25dc2199a9c500b52fed172a5b74d94339c116c6231e370b3b4e56994`. Comando: `node node_modules/playwright/cli.js test configurator-ct02.spec.ts --config <configuração privada de evidências> --project=chromium --workers=1 --retries=0`.
+
+Os checkpoints verificam preço, opcionais desmarcados, nome/asset da imagem e carregamento. **Não comparam pixels nem afirmam um estado ARIA de seleção que o produto não oferece.** A aprovação visual manual permanece separada. Online, CT03 e a suíte inteira não foram repetidos; nenhum resultado de CI ou aceite remoto é inferido.
+
+Logs, relatórios JSON/HTML e recibos com hashes foram preservados localmente no D. O caso aprovado não gerou attachments, pois a configuração só retém screenshot/trace em falhas. Isso não recupera as imagens manuais cuja persistência foi bloqueada. O aviso `NO_COLOR`/`FORCE_COLOR` no stderr não foi erro de teste. Nenhuma execução de Cursor MCP, Inspector ou UI Mode é atribuída a este complemento.
