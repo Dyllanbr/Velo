@@ -10,8 +10,18 @@ export function createCheckoutActions(page: Page) {
     name: 'Li e aceito os Termos de Uso e Política de Privacidade', exact: true,
   });
 
+  const alerts = {
+    name: page.getByTestId('error-name'),
+    surname: page.getByTestId('error-surname'),
+    email: page.getByTestId('error-email'),
+    phone: page.getByTestId('error-phone'),
+    cpf: page.getByTestId('error-cpf'),
+    store: page.getByTestId('error-store'),
+    terms: page.getByTestId('error-terms'),
+  };
+
   return {
-    elements: { terms },
+    elements: { terms, alerts },
 
     async fillCustomerData(data: { name: string; surname: string; email: string; phone: string; cpf: string }) {
       await page.getByTestId('checkout-name').fill(data.name);

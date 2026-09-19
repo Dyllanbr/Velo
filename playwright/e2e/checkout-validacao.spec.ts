@@ -34,11 +34,11 @@ const fieldErrors = {
   terms: 'Aceite os termos',
 } as const;
 type CheckoutField = keyof typeof fieldErrors;
+type CheckoutAlerts = ReturnType<typeof createCheckoutActions>['elements']['alerts'];
 
-async function expectOnlyErrors(page: Page, expected: readonly CheckoutField[]) {
+async function expectOnlyErrors(alerts: CheckoutAlerts, expected: readonly CheckoutField[]) {
   for (const field of Object.keys(fieldErrors) as CheckoutField[]) {
-    // Order.tsx groups each control and its error together; terms nests its paragraph once.
-    const alert = page.getByTestId(`checkout-${field}`).locator('..').getByRole('paragraph');
+    const alert = alerts[field];
     await expect(alert).toHaveCount(expected.includes(field) ? 1 : 0);
     if (expected.includes(field)) {
       await expect(alert).toBeVisible();
@@ -63,13 +63,13 @@ async function prepareValidCheckout(page: Page, checkout: ReturnType<typeof crea
   }
   await expect(page.getByTestId('checkout-store')).toHaveText('Velô Paulista - Av. Paulista, 1000');
   await expect(checkout.elements.terms).toBeChecked();
-  await expectOnlyErrors(page, []);
+  await expectOnlyErrors(checkout.elements.alerts, []);
 }
 
 test('checkout incompleto não envia pedido', async ({ page, app }) => {
   await app.checkout.submit();
 
-  await expectOnlyErrors(page, ['name', 'surname', 'email', 'phone', 'cpf', 'store', 'terms']);
+  await expectOnlyErrors(app.checkout.elements.alerts, ['name', 'surname', 'email', 'phone', 'cpf', 'store', 'terms']);
   await expect(page).toHaveURL(/\/order$/);
 });
 
@@ -85,7 +85,7 @@ for (const scenario of [
 
     await app.checkout.submit();
 
-    await expectOnlyErrors(page, [scenario.key]);
+    await expectOnlyErrors(app.checkout.elements.alerts, [scenario.key]);
     await expect(page).toHaveURL(/\/order$/);
   });
 }
@@ -108,7 +108,7 @@ test('checkout recusa e-mail malformado pela validação nativa sem enviar pedid
     contentType: 'application/json', body: JSON.stringify(validity, null, 2),
   });
   // The browser blocks submit before the application's schema runs; no localized text assumed.
-  await expectOnlyErrors(page, []);
+  await expectOnlyErrors(app.checkout.elements.alerts, []);
   await expect(page).toHaveURL(/\/order$/);
 });
 
@@ -124,7 +124,7 @@ for (const field of [
 
     await app.checkout.submit();
 
-    await expectOnlyErrors(page, [field.key]);
+    await expectOnlyErrors(app.checkout.elements.alerts, [field.key]);
     await expect(page).toHaveURL(/\/order$/);
   });
 }
@@ -137,6 +137,6 @@ test('checkout recusa termos não aceitos com demais campos válidos', async ({ 
 
   await app.checkout.submit();
 
-  await expectOnlyErrors(page, ['terms']);
+  await expectOnlyErrors(app.checkout.elements.alerts, ['terms']);
   await expect(page).toHaveURL(/\/order$/);
 });
