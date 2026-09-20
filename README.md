@@ -189,4 +189,6 @@ yarn build                       # Gerar dist com as variáveis do ambiente
 yarn lint                        # Análise estática com ESLint
 ```
 
-`yarn test:e2e:preview` usa o deploy remoto e os dois Supabase; execute-o somente com os pré-requisitos descritos na documentação do desafio. Os checks locais não substituem essa evidência remota.
+`yarn test:e2e:preview` usa o deploy remoto e somente o Supabase de preview; execute-o com os pré-requisitos descritos na documentação do desafio. A ausência do pedido em produção é conferida por auditoria externa, separada dos E2E. Os checks locais não substituem essas evidências remotas.
+
+Os relatórios Playwright podem ser enviados ao projeto Velo no TestDino com `TESTDINO_TOKEN`, conforme o [guia de integração](docs/testdino.md). Pull requests executam sem esse segredo; os relatórios HTML permanecem disponíveis nos artefatos do GitHub Actions.

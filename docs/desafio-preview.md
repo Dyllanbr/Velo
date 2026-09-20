@@ -44,7 +44,7 @@ O fluxo em `.github/workflows/quality-and-deploy.yml` é:
 2. Em push na `main` ou em `feat/preview-isolado`, baixar configurações de preview e conferir projeto Vercel, URLs, refs e tipo de chave pública.
 3. Construir preview, inspecionar os arquivos gerados e publicar o artefato verificado.
 4. Conferir `/build-info.json`, JavaScript servido e rotas da SPA; executar os E2E reais contra a URL desse deploy.
-5. Criar um pedido único em preview e demonstrar sua presença ali e sua ausência em produção usando somente leitura no banco de produção.
+5. Criar um pedido único em preview e demonstrar sua presença ali, sem consultar produção nos E2E. O anexo registra `productionNotContacted: true` e a necessidade de auditoria externa. A ausência em produção é conferida separadamente por leitura privilegiada dirigida ao número e ao e-mail desse pedido.
 6. Somente na `main`, reconstruir o mesmo SHA com configurações de produção, inspecionar o bundle, publicar staged e verificar por HTTP sem criar pedidos.
 7. Recusar uma `main` já ultrapassada por outro commit e promover o deploy de produção verificado.
 
@@ -130,11 +130,12 @@ Os valores compartilhados abaixo podem ser **Repository variables/secrets**, ace
 | `PREVIEW_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de preview |
 | `PRODUCTION_SUPABASE_URL` | Variable | URL HTTPS canônica do projeto de produção |
 | `PREVIEW_SUPABASE_ANON_KEY` | Secret | JWT público `anon` do preview; igual ao valor Vercel Preview |
-| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Chave pública de produção para build e consulta de ausência; igual ao valor Vercel Production. O nome do secret não impõe formato JWT. |
+| `PRODUCTION_SUPABASE_ANON_KEY` | Secret | Chave pública de produção somente para seu build; igual ao valor Vercel Production. Não é passada aos E2E. O nome do secret não impõe formato JWT. |
 | `VERCEL_TOKEN` | Secret | Token temporário autorizado da equipe / All Projects; acesso ao projeto e à leitura da equipe exigida pelo `pull` |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Secret, se necessário | Acesso da automação aos deploys protegidos |
+| `TESTDINO_TOKEN` | Secret | Project API key do projeto Velo no TestDino, disponível apenas nos passos E2E de execuções que não sejam pull requests |
 
-Nenhuma service key é necessária. O nome “Secret” no GitHub é a forma de armazenamento; as chaves `anon`/publishable continuam sendo credenciais públicas do frontend. O GitHub mascara os valores nos logs e o guard não os escreve deliberadamente.
+Nenhuma service key é necessária. O nome “Secret” no GitHub é a forma de armazenamento; as chaves `anon`/publishable continuam sendo credenciais públicas do frontend. O GitHub mascara os valores nos logs e o guard não os escreve deliberadamente. A configuração e a verificação dos relatórios no TestDino estão no [guia de integração](testdino.md).
 
 Na CLI **59.15.1** fixada neste workflow, `pull` consulta os dados da equipe mesmo com `VERCEL_ORG_ID` e `VERCEL_PROJECT_ID` definidos. A tentativa 2, com token restrito ao projeto, falhou em `Download preview settings` com `Could not retrieve Project Settings`; o comportamento é compatível com a [issue oficial #17506](https://github.com/vercel/vercel/issues/17506). Acrescentar `--scope` não remove essa consulta. Com o token de equipe configurado, o pull passou na tentativa 3 com os mesmos IDs e workflow. O status HTTP interno da tentativa 2 não foi registrado, portanto não se afirma que ela comprovou o mesmo 403 do relato externo.
 
@@ -193,6 +194,7 @@ Os runners GitHub são Linux hospedado e usam armazenamento descartável deles, 
 - Build com URL do outro ambiente: descartar o artefato e reconstruir no escopo correto.
 - Ref ou chave errada: bloquear antes de qualquer escrita; JWT `anon` é conferido por papel/ref, enquanto publishable keys opacas dependem da validação pela API real.
 - Preview verde não prova produção: produção tem seu próprio build e verificação de URL no JavaScript servido.
-- Testes locais simulados não substituem o E2E real e a consulta aos dois bancos.
+- O backend do navegador também usa transporte sem redirecionamento: somente GET, POST e OPTIONS no endpoint de pedidos do Supabase de preview são permitidos. Um 3xx é abortado antes de chegar ao navegador e registrado em `blockedBackendRedirects`; não recebe bypass da Vercel. A consulta direta de confirmação e o preflight de crédito usam `maxRedirects: 0`.
+- Testes locais simulados não substituem o E2E real no preview nem a auditoria externa em produção.
 - O E2E de isolamento usa compra à vista e faz antes um preflight vazio de `credit-analysis`. Esse preflight comprova somente presença e contrato mínimo da função de preview; sincronização de código/configuração nos dois projetos e integração externa continuam exigindo evidência própria.
 - Exposição histórica: arquivos sensíveis foram removidos do rastreamento, mas o histórico anterior não foi reescrito. A revisão por padrões dos novos commits identificou apenas duas fixtures negativas já conferidas; isso não prova ausência de segredos arbitrários nem resolve uma exposição anterior. A remoção no estado atual não substitui rotação na plataforma. Não faça force-push do histórico sem planejamento.

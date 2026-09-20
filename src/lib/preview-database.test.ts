@@ -14,9 +14,6 @@ function environment() {
     PREVIEW_SUPABASE_PROJECT_REF: DATABASE_PREVIEW_REF,
     PREVIEW_SUPABASE_URL: `https://${DATABASE_PREVIEW_REF}.supabase.co`,
     PREVIEW_SUPABASE_ANON_KEY: 'sb_publishable_fixture_preview',
-    PRODUCTION_SUPABASE_PROJECT_REF: KNOWN_PRODUCTION_REF,
-    PRODUCTION_SUPABASE_URL: `https://${KNOWN_PRODUCTION_REF}.supabase.co`,
-    PRODUCTION_SUPABASE_ANON_KEY: 'sb_publishable_fixture_production',
     E2E_BASE_URL: 'https://fixture-only.vercel.app', E2E_EXPECTED_SHA: 'a'.repeat(40),
     TEST_DATABASE_URL: `postgresql://postgres:fixture-password@db.${DATABASE_PREVIEW_REF}.supabase.co:5432/postgres`,
   };
