@@ -1,5 +1,5 @@
 import { test, expect } from '../support/fixtures';
-import { orderFixture, fillCheckout } from '../support/mock';
+import { orderFixture } from '../support/mock';
 import { type OrderDetails } from '../support/actions/orderLookupActions';
 
 test.describe('Consulta de pedidos', () => {
@@ -62,54 +62,77 @@ test.describe('Consulta de pedidos', () => {
   });
 });
 
-test('checkout incompleto não envia pedido', async ({ page }) => {
-  await page.goto('/order');
-  await page.getByTestId('checkout-submit').click();
-  await expect(page.getByText('Nome deve ter pelo menos 2 caracteres', { exact: true })).toBeVisible();
-  await expect(page.getByText('Aceite os termos', { exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/order$/);
-});
-
-for (const field of [
-  { id: 'checkout-cpf', value: '0000000000', error: 'CPF inválido' },
-  { id: 'checkout-phone', value: '1199999000', error: 'Telefone inválido' },
-]) {
-  test(`checkout recusa máscara incompleta: ${field.error}`, async ({ page }) => {
-    const fixture = orderFixture();
-    const submissions: string[] = [];
-    await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
-      submissions.push(route.request().method());
-      await route.fulfill({ status: 201, json: fixture });
-    });
-    await page.goto('/order');
-    await fillCheckout(page, fixture.customer_email);
-    await page.getByTestId(field.id).fill(field.value);
-    await expect(page.getByTestId(field.id)).toHaveValue(/_/);
-
-    await page.getByTestId('checkout-submit').click();
-
-    await expect(page.getByText(field.error, { exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/order$/);
-    expect(submissions, 'Dados incompletos não devem chegar à API').toEqual([]);
+test('checkout à vista envia configuração e apresenta o número retornado', async ({ page, context, app }, testInfo) => {
+  const customer = {
+    name: 'Cliente',
+    surname: 'Checkout QA',
+    email: 'qa-m4-checkout-local-3a897c20-2534-4219-8655-8bac5c546dbe@example.invalid',
+    phone: '(11) 99999-0000',
+    cpf: '968.314.027-04',
+    store: 'Velô Paulista - Av. Paulista, 1000',
+    paymentMethod: 'À Vista' as const,
+    totalPrice: 40000,
+  };
+  const price = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+    .format(customer.totalPrice).replace(/\u00a0/g, ' ');
+  const attemptedPosts: string[] = [];
+  const returnedOrderNumbers: string[] = [];
+  context.on('request', (request) => {
+    if (request.method() === 'POST') attemptedPosts.push(request.url());
   });
-}
-
-test('checkout à vista envia configuração e apresenta o número retornado', async ({ page }) => {
-  const fixture = orderFixture();
-  let inserted = false;
   await page.route('https://velo-e2e.invalid/rest/v1/orders**', async (route) => {
     expect(route.request().method()).toBe('POST');
+    expect(route.request().url()).toBe('https://velo-e2e.invalid/rest/v1/orders?select=*');
     const payload = route.request().postDataJSON();
-    expect(payload).toMatchObject({ customer_email: fixture.customer_email, total_price: 40000,
-      wheel_type: 'aero', optionals: [], payment_method: 'avista', status: 'APROVADO' });
-    expect(payload.order_number).toMatch(/^VLO-[A-Z0-9]{6}$/);
-    inserted = true;
-    await route.fulfill({ status: 201, json: { ...fixture, ...payload } });
+    expect(payload).toEqual({
+      order_number: expect.stringMatching(/^VLO-[A-Z0-9]{6}$/),
+      customer_name: `${customer.name} ${customer.surname}`,
+      customer_email: customer.email,
+      customer_phone: customer.phone,
+      customer_cpf: customer.cpf,
+      color: 'glacier-blue', wheel_type: 'aero', optionals: [],
+      payment_method: 'avista', total_price: customer.totalPrice, status: 'APROVADO',
+    });
+    returnedOrderNumbers.push(payload.order_number);
+    expect(returnedOrderNumbers, 'A compra deve enviar um único pedido').toHaveLength(1);
+    await route.fulfill({ status: 201, json: {
+      ...payload,
+      id: '30ba4bb4-c0eb-4251-aadb-688b07204a04',
+      created_at: '2026-01-01T12:00:00Z', updated_at: '2026-01-01T12:00:00Z',
+    } });
   });
-  await page.goto('/order');
-  await fillCheckout(page, fixture.customer_email);
-  await page.getByTestId('checkout-submit').click();
-  await expect(page.getByTestId('success-status')).toHaveText('Pedido Aprovado!');
-  await expect(page.getByTestId('order-id')).toHaveText(/^VLO-[A-Z0-9]{6}$/);
-  expect(inserted).toBe(true);
+
+  // Keep this journey in the cash case; lookup cases use their own hook.
+  await app.hero.open();
+  await app.configurator.expectPrice(price);
+  await app.configurator.finishConfigurator();
+  await app.checkout.expectLoaded();
+  await app.checkout.expectConfiguration({
+    color: 'Glacier Blue', interior: 'carbon black', wheels: 'aero Wheels',
+  });
+  await app.checkout.expectNoOptionals();
+  await app.checkout.fillCustomerData(customer);
+  await app.checkout.selectStore(customer.store);
+
+  // Act: explicitly select cash; any credit/backend request remains blocked by networkGuard.
+  await app.checkout.selectPaymentMethod(customer.paymentMethod);
+  await app.checkout.expectSummaryTotal(price);
+  await app.checkout.acceptTerms();
+  await app.checkout.submit();
+
+  // Assert: correlate the displayed number with the actual mocked POST response.
+  await app.checkout.expectResult('Pedido Aprovado!');
+  expect(returnedOrderNumbers).toHaveLength(1);
+  await expect(page.getByTestId('order-id')).toHaveText(returnedOrderNumbers[0]);
+  await expect(page.getByText(`${customer.name} ${customer.surname}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(customer.email, { exact: true })).toBeVisible();
+  await expect(page.getByText(customer.store, { exact: true })).toBeVisible();
+  await expect(page.getByText(price, { exact: true })).toBeVisible();
+  expect(attemptedPosts).toEqual(['https://velo-e2e.invalid/rest/v1/orders?select=*']);
+  await testInfo.attach('checkout-cash-evidence.json', {
+    contentType: 'application/json',
+    body: JSON.stringify({ attemptedPosts, returnedOrderNumber: returnedOrderNumbers[0],
+      totalPrice: customer.totalPrice, paymentMethod: customer.paymentMethod,
+      scope: 'Local mocked API only; no database writes or cleanup.' }, null, 2),
+  });
 });

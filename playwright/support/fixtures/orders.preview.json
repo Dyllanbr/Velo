@@ -1,0 +1,44 @@
+{
+  "aprovado": {
+    "number": "VLO-QA4A01",
+    "status": "APROVADO",
+    "color": "Glacier Blue",
+    "wheels": "aero Wheels",
+    "customer": {
+      "name": "Cliente QA M4 APROVADO",
+      "email": "qa-m4-37ccadc3-93fa-4605-a995-c3638f4aff96@example.invalid",
+      "phone": "(11) 99999-0000",
+      "document": "000.000.000-00"
+    },
+    "payment": "À Vista",
+    "total_price": "40000"
+  },
+  "reprovado": {
+    "number": "VLO-QA4A02",
+    "status": "REPROVADO",
+    "color": "Glacier Blue",
+    "wheels": "aero Wheels",
+    "customer": {
+      "name": "Cliente QA M4 REPROVADO",
+      "email": "qa-m4-ad6303db-c066-4be2-8a6a-8715233dca80@example.invalid",
+      "phone": "(11) 99999-0000",
+      "document": "000.000.000-00"
+    },
+    "payment": "À Vista",
+    "total_price": "40000"
+  },
+  "em_analise": {
+    "number": "VLO-QA4A03",
+    "status": "EM_ANALISE",
+    "color": "Glacier Blue",
+    "wheels": "aero Wheels",
+    "customer": {
+      "name": "Cliente QA M4 EM_ANALISE",
+      "email": "qa-m4-f8a3c25e-cdf0-493c-905e-689648803d46@example.invalid",
+      "phone": "(11) 99999-0000",
+      "document": "000.000.000-00"
+    },
+    "payment": "À Vista",
+    "total_price": "40000"
+  }
+}
