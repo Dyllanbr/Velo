@@ -6,9 +6,7 @@ const publicKey = 'sb_publishable_fixture_only';
 const valid = {
   E2E_PREVIEW_ALLOWED: 'true', E2E_BASE_URL: 'https://velo-preview-123.vercel.app',
   PREVIEW_SUPABASE_PROJECT_REF: ref, PREVIEW_SUPABASE_URL: `https://${ref}.supabase.co`,
-  PREVIEW_SUPABASE_ANON_KEY: publicKey, PRODUCTION_SUPABASE_PROJECT_REF: KNOWN_PRODUCTION_REF,
-  PRODUCTION_SUPABASE_URL: `https://${KNOWN_PRODUCTION_REF}.supabase.co`,
-  PRODUCTION_SUPABASE_ANON_KEY: publicKey, GITHUB_SHA: 'a'.repeat(40),
+  PREVIEW_SUPABASE_ANON_KEY: publicKey, GITHUB_SHA: 'a'.repeat(40),
 };
 const jwt = (role: string, projectRef: string) => `header.${btoa(JSON.stringify({ role, ref: projectRef }))}.signature`;
 
@@ -43,8 +41,23 @@ describe('supressão estrita do script opcional da Vercel', () => {
 });
 
 describe('guardas fail-closed da integração real', () => {
-  it('aceita preview distinto com dados completos', () => {
-    expect(previewSettings(valid).previewURL).toBe(valid.PREVIEW_SUPABASE_URL);
+  it('funciona sem URL ou chave de produção e expõe somente o ref para exclusão', () => {
+    expect(previewSettings(valid)).toEqual({
+      baseURL: valid.E2E_BASE_URL, previewRef: ref, productionRef: KNOWN_PRODUCTION_REF,
+      previewURL: valid.PREVIEW_SUPABASE_URL, previewKey: publicKey,
+      expectedSha: valid.GITHUB_SHA, bypassSecret: undefined,
+    });
+  });
+  it('não lê nem propaga URL ou chave de produção eventualmente herdadas', () => {
+    const environment = Object.defineProperties({ ...valid }, {
+      PRODUCTION_SUPABASE_URL: { get: () => { throw new Error('Production URL must not be read.'); } },
+      PRODUCTION_SUPABASE_ANON_KEY: { get: () => { throw new Error('Production key must not be read.'); } },
+    });
+    expect(previewSettings(environment)).toEqual(previewSettings(valid));
+  });
+  it('bloqueia o ref conhecido sem depender de nenhuma variável de produção', () => {
+    expect(() => previewSettings({ ...valid, PREVIEW_SUPABASE_PROJECT_REF: KNOWN_PRODUCTION_REF,
+      PREVIEW_SUPABASE_URL: `https://${KNOWN_PRODUCTION_REF}.supabase.co` })).toThrow(/produção/);
   });
   it.each(Object.keys(valid))('falta %s interrompe a suíte', (key) => {
     expect(() => previewSettings({ ...valid, [key]: undefined })).toThrow();
@@ -56,7 +69,7 @@ describe('guardas fail-closed da integração real', () => {
   it('bloqueia igualdade entre projetos, incluindo outra produção', () => {
     expect(() => previewSettings({ ...valid, PRODUCTION_SUPABASE_PROJECT_REF: ref })).toThrow(/produção/);
   });
-  it('não permite provar ausência usando uma terceira base chamada produção', () => {
+  it('não aceita uma terceira base como guard de exclusão de produção', () => {
     const otherRef = 'bbbbbbbbbbbbbbbbbbbb';
     expect(() => previewSettings({ ...valid, PRODUCTION_SUPABASE_PROJECT_REF: otherRef,
       PRODUCTION_SUPABASE_URL: `https://${otherRef}.supabase.co` })).toThrow(/produção/);

@@ -1,4 +1,4 @@
-// The real integration suite must opt in explicitly and must never write to this project.
+// The real integration suite must opt in explicitly and must never contact this project.
 export const KNOWN_PRODUCTION_REF = 'zbfdffxonoztoydpdlru';
 type Environment = Record<string, string | undefined>;
 
@@ -48,19 +48,17 @@ export function previewSettings(env: Environment) {
     throw new Error('Integração preview bloqueada: defina E2E_PREVIEW_ALLOWED=true explicitamente.');
   }
   const previewRef = required(env, 'PREVIEW_SUPABASE_PROJECT_REF');
-  const productionRef = required(env, 'PRODUCTION_SUPABASE_PROJECT_REF');
-  if (productionRef !== KNOWN_PRODUCTION_REF) {
-    throw new Error('A verificação de produção deve usar o projeto de produção conhecido.');
+  // This identity is only an exclusion guard, never an API target or credential source.
+  const productionRef = KNOWN_PRODUCTION_REF;
+  if (env.PRODUCTION_SUPABASE_PROJECT_REF && env.PRODUCTION_SUPABASE_PROJECT_REF !== productionRef) {
+    throw new Error('O guard de exclusão deve usar o projeto de produção conhecido.');
   }
   if (previewRef === productionRef || previewRef === KNOWN_PRODUCTION_REF) {
     throw new Error('Escrita bloqueada: o projeto de preview coincide com produção.');
   }
   const previewUrl = projectUrl(required(env, 'PREVIEW_SUPABASE_URL'), previewRef, 'PREVIEW_SUPABASE_URL');
-  const productionUrl = projectUrl(required(env, 'PRODUCTION_SUPABASE_URL'), productionRef, 'PRODUCTION_SUPABASE_URL');
   const previewKey = required(env, 'PREVIEW_SUPABASE_ANON_KEY');
-  const productionKey = required(env, 'PRODUCTION_SUPABASE_ANON_KEY');
   assertPublicKey(previewKey, previewRef);
-  assertPublicKey(productionKey, productionRef);
   const base = new URL(required(env, 'E2E_BASE_URL'));
   if (base.protocol !== 'https:' || !base.hostname.endsWith('.vercel.app') ||
       base.username || base.password || base.port || base.pathname !== '/' || base.search || base.hash) {
@@ -72,8 +70,7 @@ export function previewSettings(env: Environment) {
   }
   return {
     baseURL: base.origin, previewRef, productionRef,
-    previewURL: previewUrl.origin, productionURL: productionUrl.origin,
-    previewKey, productionKey,
+    previewURL: previewUrl.origin, previewKey,
     expectedSha,
     bypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET,
   };
