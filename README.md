@@ -83,6 +83,14 @@ Após as práticas do [PR #3](https://github.com/Dyllanbr/Velo/pull/3), a [execu
 
 ---
 
+## Validação da main em 20/09/2026
+
+O [PR #11](https://github.com/Dyllanbr/Velo/pull/11) foi integrado na main `63696673f034a37a5e0898169552b34b969a8cde`. A [execução 35481291413](https://github.com/Dyllanbr/Velo/actions/runs/35481291413) concluiu os três jobs de qualidade, Preview e produção com sucesso: **329 testes Vitest, 23 testes Node, 29 E2E locais com mocks e um E2E real de isolamento no Preview**, sem retries nos E2E. Tipos e build passaram; lint terminou com **zero erros e sete avisos de Fast Refresh**. Produção foi reconstruída com suas próprias variáveis, verificada e promovida no SHA testado.
+
+No mesmo SHA, o [domínio público](https://velo-one-alpha.vercel.app/) concluiu um aceite à vista em 20/09/2026 às 01:40 UTC: criação com POST 201 e consulta com GET 200. Consultas SQL dirigidas por número e e-mail confirmaram um registro em produção e nenhum no Preview, com visibilidade privilegiada dos registros, sem alterar as políticas RLS. Não houve chamada à análise de crédito.
+
+Em uma execução separada, os testes `6ac6cbe` contra o app Preview `45cf098` aprovaram **seis consultas SQL e duas compras à vista**, com um worker e retry zero. A segunda rodada substituiu somente os registros reservados; ficaram três pedidos de consulta e o último pedido próprio de compra. O [procedimento Kysely](docs/pratica-kysely-preview.md) detalha o escopo e a configuração TLS. Esses oito casos não foram executados contra o app `6369667` e não comprovam a integração externa de crédito.
+
 ## Estrutura Principal
 
 ```
