@@ -4,13 +4,15 @@ import { assertPreviewBuild, isOptionalVercelToolbarRequest, previewSettings } f
 import { checkPreviewCreditFunction } from '../../src/lib/preview-credit-preflight';
 import { fillCheckout } from '../support/mock';
 import { createRouteLifecycle, fetchProtectedApp, fulfillProtectedAppRoute } from '../support/protected-app-route';
+import { fulfillPreviewBackendRoute } from '../support/preview-backend-route';
 
 const settings = previewSettings(process.env);
 
-async function lookup(request: APIRequestContext, origin: string, key: string, column: string, value: string) {
-  const url = new URL('/rest/v1/orders', origin);
+async function lookupPreview(request: APIRequestContext, orderNumber: string) {
+  const url = new URL('/rest/v1/orders', settings.previewURL);
+  const key = settings.previewKey;
   url.searchParams.set('select', 'order_number,customer_email,status');
-  url.searchParams.set(column, `eq.${value}`);
+  url.searchParams.set('order_number', `eq.${orderNumber}`);
   const response = await request.get(url.toString(), {
     headers: { apikey: key, ...(key.startsWith('ey') ? { Authorization: `Bearer ${key}` } : {}) },
     maxRedirects: 0,
@@ -21,7 +23,7 @@ async function lookup(request: APIRequestContext, origin: string, key: string, c
   return rows;
 }
 
-test('pedido criado no preview aparece no preview e está ausente em produção', async ({ page, request }, testInfo) => {
+test('pedido criado e consultado somente no preview sem contatar produção', async ({ page, request }, testInfo) => {
   const runId = randomUUID();
   const email = `e2e-preview-${runId}@example.invalid`;
   const appHeaders: Record<string, string> = settings.bypassSecret ? { 'x-vercel-protection-bypass': settings.bypassSecret } : {};
@@ -37,12 +39,11 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
     contentType: 'application/json',
     body: JSON.stringify({ ...creditPreflight, checkedAt: new Date().toISOString() }, null, 2),
   });
-  // Confirm production lookup works before any write. Production is accessed only by GET.
-  expect(await lookup(request, settings.productionURL, settings.productionKey, 'customer_email', email)).toEqual([]);
   const blocked: string[] = [];
   const backendOrigins = new Set<string>();
   const suppressedPlatformScripts: Array<{ url: string; method: string; resourceType: string; action: string }> = [];
   const blockedAppRedirects: Array<{ origin: string; status: number; action: string }> = [];
+  const blockedBackendRedirects: Array<{ origin: string; status: number; action: string }> = [];
   const routes = createRouteLifecycle(async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -58,7 +59,10 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
     }
     if (url.origin === settings.previewURL) {
       backendOrigins.add(url.origin);
-      return route.continue();
+      return fulfillPreviewBackendRoute(route, settings, async (status) => {
+        blocked.push(url.origin);
+        blockedBackendRedirects.push({ origin: url.origin, status, action: 'abort' });
+      });
     }
     const descriptor = { url: request.url(), method: request.method(), resourceType: request.resourceType() };
     if (isOptionalVercelToolbarRequest(descriptor)) {
@@ -76,17 +80,15 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
     await expect(page.getByTestId('success-status')).toHaveText('Pedido Aprovado!');
     const orderNumber = (await page.getByTestId('order-id').innerText()).trim();
     expect(orderNumber).toMatch(/^VLO-[A-Z0-9]{6}$/);
-    const previewRows = await lookup(request, settings.previewURL, settings.previewKey, 'order_number', orderNumber);
+    const previewRows = await lookupPreview(request, orderNumber);
     expect(previewRows).toEqual([{ order_number: orderNumber, customer_email: email, status: 'APROVADO' }]);
-    const productionRows = await lookup(request, settings.productionURL, settings.productionKey, 'order_number', orderNumber);
-    expect(productionRows).toEqual([]);
-    expect(await lookup(request, settings.productionURL, settings.productionKey, 'customer_email', email)).toEqual([]);
     await page.goto('/lookup');
     await page.getByRole('textbox', { name: 'Número do Pedido', exact: true }).fill(orderNumber);
     await page.getByRole('button', { name: 'Buscar Pedido', exact: true }).click();
     await expect(page.getByTestId(`order-result-${orderNumber}`)).toContainText(email);
     await routes.drain();
-    const browserNetwork = { blockedOrigins: blocked, backendOrigins: [...backendOrigins], suppressedPlatformScripts, blockedAppRedirects };
+    const browserNetwork = { blockedOrigins: blocked, backendOrigins: [...backendOrigins], suppressedPlatformScripts,
+      blockedAppRedirects, blockedBackendRedirects };
     await testInfo.attach('browser-network-evidence.json', {
       contentType: 'application/json', body: JSON.stringify(browserNetwork, null, 2),
     });
@@ -96,10 +98,11 @@ test('pedido criado no preview aparece no preview e está ausente em produção'
       contentType: 'application/json',
       body: JSON.stringify({ runId, sha: settings.expectedSha, deployment: settings.baseURL,
         previewRef: settings.previewRef, productionRef: settings.productionRef,
-        orderNumber, previewCount: previewRows.length, productionCount: productionRows.length,
+        orderNumber, previewCount: previewRows.length, productionNotContacted: true,
+        productionAbsenceVerification: 'external_audit_required',
         creditPreflight, browserNetwork,
         checkedAt: new Date().toISOString(),
-        note: 'Dados sintéticos permanecem no preview como evidência; produção recebeu somente GET.' }, null, 2),
+        note: 'Dados sintéticos permanecem no preview; este cenário não contata produção. A ausência em produção exige auditoria externa.' }, null, 2),
     });
   } finally {
     await routes.drain();

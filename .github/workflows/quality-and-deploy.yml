@@ -44,7 +44,17 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: previewfixtureaaaaaa
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_localmockonly1234567890
       - run: yarn playwright install --with-deps chromium
-      - run: yarn test:e2e
+      - name: Run local E2E
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] && [ -z "$TESTDINO_TOKEN" ]; then
+            echo "Configure the TESTDINO_TOKEN repository secret before publishing."
+            exit 1
+          fi
+          yarn test:e2e
+        env:
+          TESTDINO_TOKEN: ${{ github.event_name != 'pull_request' && secrets.TESTDINO_TOKEN || '' }}
+          TESTDINO_DISABLE_GITHUB_AUTHOR_LOOKUP: 'true'
+          TESTDINO_DEBUG: 'false'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -117,9 +127,10 @@ jobs:
           E2E_BASE_URL: ${{ steps.deploy.outputs.url }}
           PREVIEW_SUPABASE_URL: ${{ vars.PREVIEW_SUPABASE_URL }}
           PREVIEW_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
-          PRODUCTION_SUPABASE_URL: ${{ vars.PRODUCTION_SUPABASE_URL }}
-          PRODUCTION_SUPABASE_ANON_KEY: ${{ secrets.PRODUCTION_SUPABASE_ANON_KEY }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_TOKEN }}
+          TESTDINO_DISABLE_GITHUB_AUTHOR_LOOKUP: 'true'
+          TESTDINO_DEBUG: 'false'
       - name: Record the SHA only after E2E succeeds
         id: provenance
         run: |

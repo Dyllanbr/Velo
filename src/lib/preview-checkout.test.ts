@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DATABASE_PREVIEW_REF, RESERVED_ORDERS, withOwnedPreviewCheckout } from '../../playwright/support/preview-database';
 import { assertCheckoutFixture, assertOwnedCheckoutRows, MAX_CHECKOUT_ROWS,
   RESERVED_CHECKOUT, type CheckoutRow } from '../../playwright/support/preview-checkout';
-import { KNOWN_PRODUCTION_REF } from './preview-safety';
 
 const poolConstructor = vi.hoisted(() => vi.fn<() => unknown>());
 vi.mock('pg', () => ({ Pool: poolConstructor }));
@@ -16,9 +15,6 @@ function environment() {
     PREVIEW_SUPABASE_PROJECT_REF: DATABASE_PREVIEW_REF,
     PREVIEW_SUPABASE_URL: `https://${DATABASE_PREVIEW_REF}.supabase.co`,
     PREVIEW_SUPABASE_ANON_KEY: 'sb_publishable_fixture_preview',
-    PRODUCTION_SUPABASE_PROJECT_REF: KNOWN_PRODUCTION_REF,
-    PRODUCTION_SUPABASE_URL: `https://${KNOWN_PRODUCTION_REF}.supabase.co`,
-    PRODUCTION_SUPABASE_ANON_KEY: 'sb_publishable_fixture_production',
     E2E_BASE_URL: 'https://fixture-only.vercel.app', E2E_EXPECTED_SHA: 'a'.repeat(40),
     TEST_DATABASE_URL: `postgresql://postgres:fixture-password@db.${DATABASE_PREVIEW_REF}.supabase.co:5432/postgres`,
   };
