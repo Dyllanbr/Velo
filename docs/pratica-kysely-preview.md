@@ -4,6 +4,26 @@ Esta suíte adicional demonstra a preparação de três cenários de consulta: a
 
 O código está separado das consultas locais com mocks e do E2E de isolamento do desafio. A semeadura de um status não comprova análise de crédito. Nenhum DELETE global, migration, mudança de RLS, workflow ou operação em produção faz parte desta prática.
 
+## Resultado confirmado em 20/09/2026
+
+Entre 01:38:12 e 01:39:14 UTC, **seis consultas e duas compras à vista passaram no Preview**, com um worker, retry zero e nenhum erro de teste ou global. A execução usou os testes `6ac6cbeb04a2bf11baae600b961c6dc129530b4b` e o app imutável `45cf0986b766dc08bd4dddfcfec112a2d33e2f24`.
+
+Nas consultas, a primeira rodada inseriu as três reservas; a segunda excluiu exatamente uma linha própria antes de cada reinserção. Ao fim de cada rodada, permaneceram os mesmos três registros reservados. Na compra, a primeira rodada partiu de ausência confirmada. A segunda excluiu exatamente o pedido da primeira, criou outro UUID/número e reteve um pedido próprio. Cada compra teve um único POST autorizado, enviado e aceito; as identidades HTTP/SQL coincidiram, e liberação do lock, conexão e pool foi concluída nas duas rodadas. Não houve acesso ao banco de produção nem consulta ao provedor de crédito nessa execução.
+
+Separadamente, o [pipeline da main `6369667`](https://github.com/Dyllanbr/Velo/actions/runs/35481291413), integrado pelo [PR #11](https://github.com/Dyllanbr/Velo/pull/11), aprovou **329 Vitest, 23 Node, 29 E2E locais e um E2E de isolamento no Preview**, com os três jobs concluídos. Tipos e build passaram; lint teve zero erros e sete avisos. Os oito casos SQL acima pertencem ao app `45cf098`, não à nova publicação. Os relatos de preparação e validação de 19/09 abaixo são históricos; suas pendências de execução remota foram resolvidas pelo resultado desta seção.
+
+### Certificado TLS para a conexão PostgreSQL
+
+Obtenha a CA oficial na configuração SSL do projeto no [painel Supabase](https://supabase.com/docs/guides/platform/ssl-enforcement) e salve o certificado PEM no D. Confira sua procedência e validade antes de configurar o processo que inicia os testes:
+
+```powershell
+$env:NODE_EXTRA_CA_CERTS = 'D:\Projetos\certificados\supabase-preview-ca.crt'
+```
+
+O caminho é um exemplo; o arquivo contém somente o certificado público, nunca a senha. O [Node lê `NODE_EXTRA_CA_CERTS` ao iniciar](https://nodejs.org/download/release/v24.14.0/docs/api/cli.html#node_extra_ca_certsfile) e acrescenta essa CA às raízes de confiança do processo. A suíte mantém `rejectUnauthorized: true` e a verificação do hostname do endpoint autorizado. Não use `NODE_TLS_REJECT_UNAUTHORIZED=0`, não desative TLS e não ignore avisos de certificado ausente ou inválido. Se o cliente definir `ssl.ca` explicitamente, essa lista prevalece sobre as raízes padrão e extras.
+
+Na execução acima, a CA oficial foi fornecida ao processo Node e aos workers; a conexão foi autenticada e encerrada com verificação TLS ativa antes dos testes. A configuração não instalou confiança global nem incluiu senha no certificado, código ou comando compartilhado.
+
 ## Dados e proteção
 
 `playwright/support/preview-database.ts` reserva os códigos `VLO-QA4A01`, `VLO-QA4A02` e `VLO-QA4A03`, cada um com UUID e e-mail sintético próprios. Os três valores identificadores permanecem estáveis entre execuções. Isso é uma adaptação de ownership: a demonstração da aula mantém o número de negócio, mas gera outro UUID a cada INSERT.
